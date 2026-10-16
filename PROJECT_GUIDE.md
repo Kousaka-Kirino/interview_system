@@ -1772,3 +1772,70 @@ curl.exe "http://127.0.0.1:8000/api/resumes"
 - **接口新增**：`POST/GET /api/resumes` 与 `GET/DELETE /api/resumes/{resume_id}`。
 - **测试结果**：隔离环境 pytest 15 项通过；你自己的 Windows 机器尚待验证。
 - **下一步**：Stage 2 补充资料 RAG（不把简历再嵌入向量库）。
+
+---
+
+<!-- Stage5A-20261016: PROJECT_GUIDE -->
+## Stage 5A：React 仪表盘、历史查询与本地联调（2026-10-16）
+
+> 文档版本升级为 V1.8；此小节仅为增量追加。用户本机验收尚待执行；本次提供的代码不代表已在用户 Windows 上通过构建。
+
+### 阶段定位
+
+- Stage 4：面试历史、全局统计、离线规则复盘和可选 AI 复盘后端已有代码。
+- Stage 5A：React 页面，调用现有历史与统计 API；**没有新增或改动后端 HTTP 路由、SQLite 表或 ChromaDB 索引**。
+- Stage 5B：简历与补充资料管理页面（待完成）；Stage 5C 创建面试、Stage 5D 多轮答题、Stage 5E 复盘可视化、Stage 5F 验收与部署均待完成。
+
+### 本阶段前端文件
+
+| 路径 | 职责 |
+|---|---|
+| `frontend/src/types/interview.ts` | 与 Stage 4 统计及历史 JSON 对齐的类型；`average_score` 可为 null |
+| `frontend/src/lib/api.ts` | 相对 `/api` 的 fetch 封装；JSON/网络/HTTP 错误、AbortSignal |
+| `frontend/src/pages/DashboardPage.tsx` | 4 张统计卡片、历史记录分页/筛选、加载/错误/空状态、刷新 |
+| `frontend/src/App.tsx` | 根页面入口（本阶段仅渲染仪表盘） |
+| `frontend/src/index.css` | Tailwind CSS v4 入口和最小 CSS 重置 |
+| `frontend/vite.config.ts` | React、Tailwind 插件；`/api` 开发代理转发至 `127.0.0.1:8000` |
+
+`frontend/src/main.tsx` 应保留 Vite 默认生成的 `import './index.css'`。不要求 React Router / TanStack Query / ECharts / Axios；本阶段仅需 `lucide-react`、`tailwindcss`、`@tailwindcss/vite` 和 Vite 默认 React 依赖。
+
+### 本地环境与排障
+
+用户已反馈：Windows x64、Node v24.13.0、npm v11.6.2、Vite v8.3.4。首次 `create-vite` 自动安装超过 20 分钟；改用镜像源 `https://registry.npmmirror.com` 后安装成功。首次 Vite build 遇到 `Cannot find module '../lightningcss.win32-x64-msvc.node'`，属于 Windows x64 原生可选包安装不完整。后续用户反馈依赖安装与基础工程 build 已通过。后续如再次缺失原生包，可在 `frontend` 执行 `npm.cmd install --include=optional --registry=https://registry.npmmirror.com --no-audit --no-fund`；如仍失败，备份 `package-lock.json` 后重装依赖。**不要重复初始化 Vite，也不要删除 `src`**。
+
+### 安装/运行/联调
+
+终端 A（项目根目录执行）：
+
+```powershell
+$python = (Resolve-Path .\.venvs\interview_system\Scripts\python.exe).Path
+Set-Location .\backend
+& $python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+终端 B：
+
+```powershell
+Set-Location C:\Users\Kirino\Desktop\interview_system\frontend
+npm.cmd install lucide-react --registry=https://registry.npmmirror.com --no-audit --no-fund
+npm.cmd install -D tailwindcss @tailwindcss/vite --registry=https://registry.npmmirror.com --no-audit --no-fund
+npm.cmd run build
+npm.cmd run dev
+```
+
+浏览器访问 `http://127.0.0.1:5173/`，验证“全部面试/进行中/已完成”筛选、刷新、空状态和统计卡片；直接检查 `http://127.0.0.1:8000/api/interviews/statistics` 和 `http://127.0.0.1:8000/api/interviews/history?limit=8&offset=0` 的 JSON。历史为 0 是合法状态；不是前端失败。
+
+### 验收与限制
+
+1. 前端 `npm.cmd run build` 必须成功。若 `main.tsx` 未引入 `index.css`，需补充样式导入。
+2. 两个 API 正常时，显示四个统计卡片；空历史显示空状态，平均分 null 展示 `—`。
+3. 状态过滤切换时重新拉取并从第 1 页开始；每页 8 条，超过 8 条才允许翻页。
+4. 后端停止时应显示重试提示；不得把错误误判为无历史数据。
+5. 此阶段没有简历上传、真实面试、报告详情入口，这些留给 Stage 5B～5E，不提供无响应的假按钮。
+6. 浏览器前端不得存放 DeepSeek Key、简历敏感数据或任何后端 `.env` 内容。本地单用户服务暂不对公网开放。
+
+### 开发日志
+
+- 2026-10-16：Vite/React 初始化，npm 镜像与 Lightning CSS 安装异常已排障；用户反馈依赖与基础构建已通过。
+- 2026-10-16：交付 Stage 5A 前端源码、文档增量与 PowerShell 安装脚本；尚未收到本机前后端联调验收结果。
+- 下一步：Stage 5B，简历 / 补充材料文件管理页面。
