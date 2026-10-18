@@ -641,3 +641,21 @@ The new configuration value `answer_minutes` (conceptual only; not sent as an AP
 
 **Scope and limitations:** no backend time enforcement, no cross-browser synchronization and no database persistence. The speech transcription API still restricts one recording to about 2 minutes and to the existing file-size cap; a longer answer needs multiple recordings. Auth, resource ownership, scoring and the API contracts are not altered.
 <!-- STAGE9C_DURATION_END -->
+
+<!-- STAGE9D_DUAL_DURATION_BEGIN -->
+## Stage 9D - Two browser-side timing settings (no API changes)
+
+| Field | Storage key | Default | Valid values |
+|---|---|---:|---|
+| Per-question minutes | `stage9c:minutes:{session_id}` | 2 | Integer 0-60 |
+| Whole-defense minutes | `stage9d:total-minutes:{session_id}` | 0 (unlimited) | Integer 0-60 |
+| Per-question deadline | `stage9:deadline:{session_id}:{turn_id}` | N/A | Unix epoch milliseconds |
+| Whole-defense deadline | `stage9d:total-deadline:{session_id}` | N/A | Unix epoch milliseconds |
+| Total-time continue flag | `stage9d:total-continue:{session_id}` | false | `1` if user selected continue |
+
+- The client reads the current unanswered question using authenticated `GET /api/interviews/{session_id}`.
+- Speech input remains authenticated `POST /api/speech/transcribe` (multipart audio).
+- Answer/skip remains `POST /api/interviews/{session_id}/answer` with existing `turn_id`, `answer`, `user_feedback` contract. Skip is still sent as text; original scoring may count it.
+- On user choice to finish the whole defense, the browser calls `POST /api/interviews/{session_id}/finish` (no body), then reloads the session. It does **not** submit any outstanding draft automatically.
+- Timers and configuration are browser-local; there is no new backend API, schema, or server validation of the minute limits.
+<!-- STAGE9D_DUAL_DURATION_END -->

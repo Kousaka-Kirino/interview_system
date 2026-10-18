@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import './speechTimer.css'
-import { DEFAULT_MINUTES, MAX_MINUTES, PREFERRED_MINUTES_KEY, durationForSession,
-  parseMinutes, sessionMinutesKey, stableDeadline } from './defenseTime'
+import { DEFAULT_MINUTES, MAX_MINUTES, PREFERRED_MINUTES_KEY,
+  PREFERRED_TOTAL_MINUTES_KEY, durationForSession, totalMinutesForSession,
+  parseMinutes, sessionMinutesKey, sessionTotalMinutesKey, sessionTotalDeadlineKey,
+  sessionTotalContinueKey, stableDeadline } from './defenseTime'
 
 type Turn = {
   id: number | string
@@ -55,10 +57,18 @@ function DefenseTimeSetting() {
     try { return String(parseMinutes(window.localStorage.getItem(PREFERRED_MINUTES_KEY)) ?? DEFAULT_MINUTES) }
     catch { return String(DEFAULT_MINUTES) }
   })
+  const [totalMinutesText, setTotalMinutesText] = useState(() => {
+    try { return String(parseMinutes(window.localStorage.getItem(PREFERRED_TOTAL_MINUTES_KEY)) ?? 0) }
+    catch { return '0' }
+  })
   const inputRef = useRef(minutesText)
+  const totalInputRef = useRef(totalMinutesText)
   inputRef.current = minutesText
+  totalInputRef.current = totalMinutesText
   const valid = parseMinutes(minutesText) !== null
+  const totalValid = parseMinutes(totalMinutesText) !== null
   const noLimitSelected = parseMinutes(minutesText) === 0
+  const totalUnlimited = parseMinutes(totalMinutesText) === 0
 
   useEffect(() => {
     const sync = () => setIsConfig(/^#(?:configure|interview)(?:\?.*)?$/.test(window.location.hash))
@@ -79,6 +89,30 @@ function DefenseTimeSetting() {
         .find((item) => item.getClientRects().length > 0)
       const host = form ?? main
       if (!host) { node.remove(); return }
+      // Stage 9D: use the SAME visual width as the existing configure panel.
+      // Some earlier screens have a full-width <main> around a centered max-width form.
+      const hostWidth = host.getBoundingClientRect().width
+      const mainWidth = main?.getBoundingClientRect().width || hostWidth
+      const createCandidate = Array.from((form ?? main ?? document).querySelectorAll<HTMLButtonElement>('button'))
+        .find((button) => /开始答辩|创建答辩|开始面试|创建面试/.test(button.textContent || ''))
+      let matchingWidth: number | null = null
+      if (createCandidate && main) {
+        let ancestor: HTMLElement | null = createCandidate.parentElement
+        while (ancestor && ancestor !== main) {
+          const width = ancestor.getBoundingClientRect().width
+          if (width >= 340 && width < mainWidth - 24) {
+            matchingWidth = matchingWidth === null ? width : Math.max(matchingWidth, width)
+          }
+          ancestor = ancestor.parentElement
+        }
+      }
+      // A <form> may be the actual centered panel; its measured width wins.
+      if (form && form.getBoundingClientRect().width < mainWidth - 24) {
+        matchingWidth = form.getBoundingClientRect().width
+      }
+      node.style.maxWidth = matchingWidth !== null ? `${Math.floor(matchingWidth)}px` : '100%'
+      node.style.marginLeft = 'auto'
+      node.style.marginRight = 'auto'
       // Prefer immediately before the main action row, otherwise append to the config body.
       const createButton = form && Array.from(form.querySelectorAll<HTMLButtonElement>('button'))
         .find((button) => /开始答辩|创建答辩|开始面试|创建面试/.test(button.textContent || ''))
@@ -97,9 +131,12 @@ function DefenseTimeSetting() {
     const bindNewSession = () => {
       const nextSession = sessionFromHash()
       const entered = parseMinutes(inputRef.current)
-      if (!nextSession || entered === null) return
-      try { window.localStorage.setItem(sessionMinutesKey(nextSession), String(entered)) }
-      catch { /* Private browsing can disable persistence; default still works. */ }
+      const totalEntered = parseMinutes(totalInputRef.current)
+      if (!nextSession || entered === null || totalEntered === null) return
+      try {
+        window.localStorage.setItem(sessionMinutesKey(nextSession), String(entered))
+        window.localStorage.setItem(sessionTotalMinutesKey(nextSession), String(totalEntered))
+      } catch { /* Private browsing can disable persistence; defaults still work. */ }
     }
     window.addEventListener('hashchange', bindNewSession)
     return () => {
@@ -121,32 +158,67 @@ function DefenseTimeSetting() {
     }
   }
 
-  function restoreInvalid() {
-    if (valid) return
-    let last = DEFAULT_MINUTES
-    try { last = parseMinutes(window.localStorage.getItem(PREFERRED_MINUTES_KEY)) ?? DEFAULT_MINUTES }
+  function setTotalMinutes(value: string) {
+    totalInputRef.current = value
+    setTotalMinutesText(value)
+    const number = parseMinutes(value)
+    if (number !== null) {
+      try { window.localStorage.setItem(PREFERRED_TOTAL_MINUTES_KEY, String(number)) }
+      catch { /* allow form to remain usable */ }
+    }
+  }
+  function restoreInvalid(field: 'question' | 'total') {
+    const isQuestion = field === 'question'
+    if (isQuestion ? valid : totalValid) return
+    const key = isQuestion ? PREFERRED_MINUTES_KEY : PREFERRED_TOTAL_MINUTES_KEY
+    const fallback = isQuestion ? DEFAULT_MINUTES : 0
+    let last = fallback
+    try { last = parseMinutes(window.localStorage.getItem(key)) ?? fallback }
     catch { /* keep default */ }
-    setMinutes(String(last))
+    if (isQuestion) setMinutes(String(last))
+    else setTotalMinutes(String(last))
   }
 
   if (!isConfig || !slot) return null
-  return createPortal(<section className="stage9c-config" aria-label="每题答辩时间设置">
-    <div className="stage9c-config-head">
-      <label htmlFor="stage9c-minutes">答辩时间（每题，分钟）</label>
-      <span>0 ～ 60</span>
+  return createPortal(<section className="stage9c-config" aria-label="答辩时间设置">
+    <div className="stage9d-duration-grid">
+      <div className="stage9d-duration-item">
+        <div className="stage9c-config-head">
+          <label htmlFor="stage9c-minutes">每题回答时间（分钟）</label>
+          <span>0 ～ 60</span>
+        </div>
+        <div className="stage9c-config-row">
+          <input id="stage9c-minutes" type="number" inputMode="numeric" min={0} max={MAX_MINUTES} step={1}
+            value={minutesText} onChange={(event) => setMinutes(event.target.value)}
+            onBlur={() => restoreInvalid('question')}
+            aria-invalid={!valid} aria-describedby="stage9d-question-help" />
+          <span className="stage9c-unit">分钟</span>
+          <span className="stage9c-config-hint">{noLimitSelected ? '不限时' : `每题 ${minutesText} 分钟`}</span>
+        </div>
+        <p className="stage9c-help" id="stage9d-question-help">0 表示不限制单题时间；默认 2 分钟。每道新题重新计时。</p>
+        {!valid && <p className="stage9c-error" role="alert">每题时间必须是 0～60 的整数。</p>}
+      </div>
+      <div className="stage9d-duration-item">
+        <div className="stage9c-config-head">
+          <label htmlFor="stage9d-total-minutes">本次答辩总时间（分钟）</label>
+          <span>0 ～ 60</span>
+        </div>
+        <div className="stage9c-config-row">
+          <input id="stage9d-total-minutes" type="number" inputMode="numeric" min={0} max={MAX_MINUTES} step={1}
+            value={totalMinutesText} onChange={(event) => setTotalMinutes(event.target.value)}
+            onBlur={() => restoreInvalid('total')}
+            aria-invalid={!totalValid} aria-describedby="stage9d-total-help" />
+          <span className="stage9c-unit">分钟</span>
+          <span className="stage9c-config-hint">{totalUnlimited ? '整场不限时' : `整场 ${totalMinutesText} 分钟`}</span>
+        </div>
+        <p className="stage9c-help" id="stage9d-total-help">0 表示不限制整场时间；默认 0。从首次显示题目开始持续计时，切换题目不重置。</p>
+        {!totalValid && <p className="stage9c-error" role="alert">总时间必须是 0～60 的整数。</p>}
+      </div>
     </div>
-    <div className="stage9c-config-row">
-      <input id="stage9c-minutes" type="number" inputMode="numeric" min={0} max={MAX_MINUTES} step={1}
-        value={minutesText} onChange={(event) => setMinutes(event.target.value)} onBlur={restoreInvalid}
-        aria-invalid={!valid} aria-describedby="stage9c-minute-help" />
-      <span className="stage9c-unit">分钟</span>
-      <span className="stage9c-config-hint">{noLimitSelected ? '当前为不限时' : '当前为每题倒计时'}</span>
-    </div>
-    <p id="stage9c-minute-help" className="stage9c-help">
-      0 表示不限时，1～60 表示每道题的倒计时。默认 2 分钟；创建答辩后本次会话固定使用所选值。
-      已有会话不受影响。每段语音录音最长约 2 分钟，可多次录音。
+    <p className="stage9c-help stage9d-bottom-help">
+      创建新答辩后两项设置固定到本次会话。总时间到期时选择继续或结束本场；不会自动丢弃答案。
+      已有会话保持原设置。单段语音最多录制约 2 分钟，可分段转写。
     </p>
-    {!valid && <p className="stage9c-error" role="alert">请输入 0～60 的整数；离开输入框会恢复为上次有效值。</p>}
   </section>, slot)
 }
 
@@ -161,6 +233,10 @@ export default function DefenseVoiceTimer() {
   const [deadline, setDeadline] = useState<number | null>(null)
   const [remaining, setRemaining] = useState(DEFAULT_MINUTES * 60)
   const [continued, setContinued] = useState(false)
+  const [totalDeadline, setTotalDeadline] = useState<number | null>(null)
+  const [totalRemaining, setTotalRemaining] = useState(0)
+  const [totalContinued, setTotalContinued] = useState(false)
+  const [finishing, setFinishing] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
@@ -184,6 +260,10 @@ export default function DefenseVoiceTimer() {
   try { answerMinutes = durationForSession(sessionId, window.localStorage) }
   catch { /* storage may be restricted in private mode */ }
   const unlimited = answerMinutes === 0
+  let totalMinutes = 0
+  try { totalMinutes = totalMinutesForSession(sessionId, window.localStorage) }
+  catch { /* storage may be restricted */ }
+  const totalActive = session?.status === 'active' && !!turnKey && totalMinutes > 0
 
   useEffect(() => {
     const update = () => setSessionId(sessionFromHash())
@@ -276,6 +356,33 @@ export default function DefenseVoiceTimer() {
     return () => window.clearInterval(interval)
   }, [deadline])
 
+  useEffect(() => {
+    if (!totalActive || !sessionId) {
+      setTotalDeadline(null)
+      setTotalRemaining(0)
+      setTotalContinued(false)
+      return
+    }
+    const key = sessionTotalDeadlineKey(sessionId)
+    let endAt: number
+    try { endAt = stableDeadline(key, totalMinutes, window.localStorage, Date.now()) }
+    catch { endAt = Date.now() + totalMinutes * 60_000 }
+    let choseContinue = false
+    try { choseContinue = window.localStorage.getItem(sessionTotalContinueKey(sessionId)) === '1' }
+    catch { /* storage may be disabled */ }
+    setTotalDeadline(endAt)
+    setTotalContinued(choseContinue)
+    setTotalRemaining(Math.ceil((endAt - Date.now()) / 1000))
+  }, [sessionId, totalMinutes, totalActive])
+
+  useEffect(() => {
+    if (totalDeadline === null) return
+    const update = () => setTotalRemaining(Math.ceil((totalDeadline - Date.now()) / 1000))
+    update()
+    const interval = window.setInterval(update, 250)
+    return () => window.clearInterval(interval)
+  }, [totalDeadline])
+
   useEffect(() => () => {
     discardRef.current = true
     if (recordTimeoutRef.current !== null) window.clearTimeout(recordTimeoutRef.current)
@@ -356,11 +463,42 @@ export default function DefenseVoiceTimer() {
     setContinued(true)
   }
 
+  function continueSession() {
+    if (!sessionId) return
+    try { window.localStorage.setItem(sessionTotalContinueKey(sessionId), '1') }
+    catch { /* still works until refresh */ }
+    setTotalContinued(true)
+  }
+
+  async function finishSession() {
+    if (!sessionId || finishing || submitting) return
+    setFinishing(true); setError(''); setNotice('正在结束本次答辩，请勿重复操作。')
+    try {
+      const live = await fetch(`/api/interviews/${encodeURIComponent(sessionId)}`, {
+        credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' },
+      })
+      if (!live.ok) throw await apiError(live)
+      const current = await live.json() as Session
+      if (current.status !== 'active') { window.location.reload(); return }
+      const response = await fetch(`/api/interviews/${encodeURIComponent(sessionId)}/finish`, {
+        method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' },
+      })
+      if (!response.ok) throw await apiError(response)
+      window.location.reload()
+    } catch (cause) {
+      setError(`${messageOf(cause)} 如果服务端已完成，请刷新页面检查状态。`)
+      setFinishing(false)
+    }
+  }
+
   async function submitAnswer(skip: boolean) {
     if (!sessionId || !pendingTurn || !turnKey || submitting) return
     const answer = skip ? SKIP_TEXT : transcript.trim()
     if (!answer) { setError('请先录音识别或输入回答文字。'); return }
-    if (!skip && !unlimited && remaining <= 0 && !continued) { setError('请先在超时提示中选择继续作答。'); return }
+    if (totalActive && totalDeadline !== null && totalRemaining <= 0 && !totalContinued) {
+      setError('本次答辩总时间已到，请先选择继续本场或结束本场。'); return
+    }
+    if (!skip && !unlimited && remaining <= 0 && !continued) { setError('请先在本题超时提示中选择继续作答。'); return }
     const expected = turnKey
     setSubmitting(true); setError(''); setNotice('正在提交给本地答辩后端，请勿重复提交。')
     try {
@@ -396,18 +534,33 @@ export default function DefenseVoiceTimer() {
   }
 
   if (!turnKey || !pendingTurn || (!unlimited && deadline === null) || !slot) return <DefenseTimeSetting />
-  const timeoutPrompt = !unlimited && remaining <= 0 && !continued && !submitting
+  const wholeSessionTimeIsUp = totalActive && totalDeadline !== null && totalRemaining <= 0 && !totalContinued
+  const totalTimeoutPrompt = wholeSessionTimeIsUp && !submitting
+  const timeoutPrompt = !wholeSessionTimeIsUp && !unlimited && remaining <= 0 && !continued && !submitting && !finishing
   const late = !unlimited && remaining <= 0
+  const totalLate = totalActive && totalRemaining <= 0
   return <><DefenseTimeSetting />{createPortal(<>
     <section className="stage9-panel" aria-label="语音答辩与每题倒计时">
       <div className="stage9-title">
         <h3>语音回答 · 第 {pendingTurn.question_number ?? '—'} 题</h3>
-        <div className={`stage9-timer${late ? ' expired' : !unlimited && remaining <= 30 ? ' warning' : ''}`} role="timer" aria-label="剩余答辩时间">
-          {unlimited ? '不限时' : late ? `超时 +${formatTimer(remaining)}` : formatTimer(remaining)}
+        <div className="stage9d-timer-pair">
+          <div className="stage9d-timer-block">
+            <span className="stage9d-timer-label">本题剩余</span>
+            <div className={`stage9-timer${late ? ' expired' : !unlimited && remaining <= 30 ? ' warning' : ''}`} role="timer" aria-label="本题剩余时间">
+              {unlimited ? '不限时' : late ? `超时 +${formatTimer(remaining)}` : formatTimer(remaining)}
+            </div>
+          </div>
+          <div className="stage9d-timer-block">
+            <span className="stage9d-timer-label">本场剩余</span>
+            <div className={`stage9-timer${totalLate ? ' expired' : totalActive && totalRemaining <= 60 ? ' warning' : ''}`} role="timer" aria-label="本场剩余时间">
+              {!totalActive ? '不限时' : totalLate ? `超时 +${formatTimer(totalRemaining)}` : formatTimer(totalRemaining)}
+            </div>
+          </div>
         </div>
       </div>
       {!unlimited && <div className="stage9-progress"><span style={{ width: `${Math.max(0, Math.min(100, remaining / (answerMinutes * 60) * 100))}%` }} /></div>}
-      <p className="stage9-help">本次设置：{unlimited ? '不限时' : `每题 ${answerMinutes} 分钟`}；录音、转写、文字修改均计入答题时间。刷新不重置倒计时。单段语音最长约 2 分钟，可分段录制。</p>
+      <p className="stage9-help">本题：{unlimited ? '不限时' : `${answerMinutes} 分钟`}；本场：{totalMinutes === 0 ? '不限时' : `${totalMinutes} 分钟`}。
+        两个倒计时同时运行，录音、转写、修改文字均计时。刷新及换题不会重置本场时间；单段录音最长约 2 分钟。</p>
       <div className="stage9-row">
         {recording
           ? <button type="button" className="stage9-button stop" onClick={stopRecording}>■ 停止录音并识别</button>
@@ -418,13 +571,27 @@ export default function DefenseVoiceTimer() {
       <textarea id="stage9-draft" className="stage9-textarea" value={transcript} onChange={(event) => setTranscript(event.target.value)}
         placeholder="点击麦克风回答，停止录音后这里会出现识别文字…" aria-label="可编辑的语音识别回答草稿" />
       <div className="stage9-row">
-        <button type="button" className="stage9-button primary" disabled={submitting || transcribing || recording || !transcript.trim() || timeoutPrompt}
+        <button type="button" className="stage9-button primary" disabled={submitting || finishing || transcribing || recording || !transcript.trim() || timeoutPrompt || totalTimeoutPrompt}
           onClick={() => void submitAnswer(false)}>{submitting ? '提交中…' : '提交本题回答'}</button>
         <span className="stage9-help">原有文字回答框仍可正常使用。</span>
       </div>
       {!!notice && <p role="status" className="stage9-status">{notice}</p>}
       {!!error && <p role="alert" className="stage9-error">{error}</p>}
     </section>
+    {totalTimeoutPrompt && <div className="stage9-modal-bg" role="dialog" aria-modal="true" aria-label="本次答辩总时间已到">
+      <div className="stage9-modal">
+        <h3>本次答辩的 {totalMinutes} 分钟已结束</h3>
+        <p>总时长已到。你可以继续本次答辩（显示超出时间），也可以结束本场并查看报告。</p>
+        <p>结束本场会调用原有完成接口；尚未提交的文字不会自动保存。请先保存有需要的回答。</p>
+        {!!error && <p role="alert" className="stage9-error">{error}</p>}
+        <div className="stage9-row">
+          <button type="button" className="stage9-button primary" disabled={finishing} onClick={continueSession}>继续本次答辩</button>
+          <button type="button" className="stage9-button stop" disabled={finishing} onClick={() => void finishSession()}>
+            {finishing ? '结束中…' : '结束本场答辩'}
+          </button>
+        </div>
+      </div>
+    </div>}
     {timeoutPrompt && <div className="stage9-modal-bg" role="dialog" aria-modal="true" aria-label="本题已超时">
       <div className="stage9-modal">
         <h3>本题 {answerMinutes} 分钟已结束</h3>

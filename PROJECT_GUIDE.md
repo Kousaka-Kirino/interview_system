@@ -697,3 +697,17 @@ Stage 8C-3：根据实际业务模型逐接口实现列表/统计过滤和上传
 - Limitation: time preferences and deadlines are **client-side**, not enforced by FastAPI. They do not synchronize across browsers/devices and may be lost if the user clears site data. No database schema, Ollama or API changes.
 - Validation: test 0, 1, 2, 60; reject -1, 61, fractions and blank; confirm new sessions inherit setting; check page refresh and the old-session 2-minute fallback.
 <!-- STAGE9C_DURATION_END -->
+
+<!-- STAGE9D_DUAL_DURATION_BEGIN -->
+## Stage 9D - Dual defense duration and width alignment
+
+- The configure page now presents two independent integer inputs in the same navy card: **each question (0-60 minutes)** and **whole defense (0-60 minutes)**. They default to **2** and **0 (unlimited)** respectively; `0` means that timer is disabled.
+- The added card automatically matches the width of the existing central configure panel, including layouts where `<main>` itself spans the viewport. At smaller viewports the inputs stack vertically.
+- New sessions inherit both values when the configuration page navigates to `#session/{id}`. Previous sessions continue with their Stage 9C per-question timer (2-minute fallback when unset) and *no newly imposed whole-defense limit*.
+- On the answer page, both remaining times appear together. Per-question time is reset for each unanswered turn; whole-defense time starts when the first unanswered turn becomes available and persists across question changes and refreshes.
+- A per-question timeout offers continued answering or skip (existing behavior). A whole-defense timeout takes precedence and offers **continue this defense** or **finish this defense**. Finishing uses the existing authenticated `POST /api/interviews/{session_id}/finish` endpoint; unsubmitted drafts are not automatically saved.
+- The new whole-defense deadline and continue choice are stored in localStorage with distinct per-session keys, and do not overwrite the existing Stage 9 per-question deadline keys.
+- Client-side timer only: not a server-enforced timeout and not portable across devices; clearing browser storage may discard settings. Existing local recording max of approximately 2 minutes per clip remains unchanged.
+- Install requires the exact delivered Stage 9C frontend files, backs up all touched files, runs `npm.cmd run build`, and restores on build failure. No backend/database/Whisper/Ollama changes.
+- Manual checks: 0/1/60 on each input, widths at large/narrow viewport, question change, page refresh, simultaneous expiry, finish failure, and historical session fallback.
+<!-- STAGE9D_DUAL_DURATION_END -->

@@ -46,3 +46,22 @@
 .stage9c-config-hint { font-size:12px; color:#67e8f9; }
 .stage9c-help { font-size:12px; line-height:1.7; color:#9aacc9; margin:9px 0 0; }
 .stage9c-error { margin-top:7px; color:#fca5a5; font-size:12px; }
+
+/* Stage 9D: center the settings with the existing configuration panel. */
+.stage9c-config-slot { box-sizing:border-box; width:100%; max-width:100%; margin:14px auto 18px; }
+.stage9c-config { box-sizing:border-box; width:100%; }
+.stage9d-duration-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+.stage9d-duration-item { min-width:0; padding:12px 14px; background:#111e33;
+  border:1px solid #293952; border-radius:12px; }
+.stage9d-bottom-help { margin:13px 0 0; }
+.stage9d-timer-pair { display:flex; gap:17px; align-items:center; flex-wrap:wrap; }
+.stage9d-timer-block { min-width:110px; display:flex; flex-direction:column; align-items:flex-end; }
+.stage9d-timer-block + .stage9d-timer-block { border-left:1px solid #293952; padding-left:17px; }
+.stage9d-timer-label { font-size:11px; color:#9aacc9; }
+@media(max-width:680px) {
+  .stage9d-duration-grid { grid-template-columns:1fr; }
+  .stage9d-timer-pair { gap:12px; }
+  .stage9d-timer-block + .stage9d-timer-block { padding-left:12px; }
+  .stage9d-timer-block { min-width:86px; }
+  .stage9d-timer-block .stage9-timer { font-size:21px; }
+}

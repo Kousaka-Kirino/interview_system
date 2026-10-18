@@ -44,3 +44,21 @@ export function stableDeadline(turnKey: string, minutes: number, storage: Timing
   try { storage.setItem(turnKey, String(deadline)) } catch { /* still usable this page */ }
   return deadline
 }
+
+/** Stage 9D: second setting + persistent whole-session timer. Existing keys remain stable. */
+export const DEFAULT_TOTAL_MINUTES = 0
+export const PREFERRED_TOTAL_MINUTES_KEY = 'stage9d:preferred-total-minutes'
+export function sessionTotalMinutesKey(sessionId: string): string {
+  return `stage9d:total-minutes:${sessionId}`
+}
+export function sessionTotalDeadlineKey(sessionId: string): string {
+  return `stage9d:total-deadline:${sessionId}`
+}
+export function sessionTotalContinueKey(sessionId: string): string {
+  return `stage9d:total-continue:${sessionId}`
+}
+export function totalMinutesForSession(sessionId: string | null, storage: TimingStorage): number {
+  if (!sessionId) return DEFAULT_TOTAL_MINUTES
+  try { return parseMinutes(storage.getItem(sessionTotalMinutesKey(sessionId))) ?? DEFAULT_TOTAL_MINUTES }
+  catch { return DEFAULT_TOTAL_MINUTES }
+}
