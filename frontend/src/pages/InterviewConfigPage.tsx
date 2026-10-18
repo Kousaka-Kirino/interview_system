@@ -28,6 +28,100 @@ const adaptation = [
   { value: 3, name: '积极', text: '快速响应表现' },
 ]
 
+
+/**
+ * Stage 9F — layout-only overrides for the original Stage 9E portal inputs.
+ * Leave the recording, session timers, and localStorage handlers untouched.
+ */
+const durationLayoutCSS = `
+[data-defense-config="true"] .stage9e-in-left.stage9c-config-slot {
+  box-sizing: border-box;
+  margin: 0 !important;
+  width: 100%;
+  max-width: 100%;
+}
+[data-defense-config="true"] .stage9e-in-left .stage9c-config {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-height: 0 !important;
+  padding: 15px 17px !important;
+  border: 1px solid rgba(255,255,255,.10) !important;
+  border-radius: 16px !important;
+  background: rgba(15,23,42,.75) !important;
+  color: #e8eefc;
+}
+[data-defense-config="true"] .stage9e-in-left .stage9c-config::before {
+  content: "5. 答辩时间设置";
+  display: block;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.4;
+  color: #f8fafc;
+}
+[data-defense-config="true"] .stage9e-in-left .stage9d-duration-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr)) !important;
+  gap: 12px !important;
+  flex: 1 1 auto;
+  align-items: stretch;
+}
+[data-defense-config="true"] .stage9e-in-left .stage9d-duration-item {
+  min-width: 0;
+  border-radius: 12px;
+  padding: 11px 12px !important;
+  background: #111e33 !important;
+  border: 1px solid #293952 !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+[data-defense-config="true"] .stage9e-in-left .stage9c-config-head {
+  font-size: 12px !important;
+  font-weight: 650;
+  gap: 6px;
+}
+[data-defense-config="true"] .stage9e-in-left .stage9c-config-head span {
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+[data-defense-config="true"] .stage9e-in-left .stage9c-config-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px !important;
+  margin-top: 7px !important;
+}
+[data-defense-config="true"] .stage9e-in-left .stage9c-config input {
+  box-sizing: border-box;
+  width: 82px !important;
+  min-height: 38px;
+  padding: 6px 9px !important;
+  font-size: 16px !important;
+  border-radius: 9px;
+}
+[data-defense-config="true"] .stage9e-in-left .stage9c-config-hint {
+  font-size: 11px;
+}
+[data-defense-config="true"] .stage9e-in-left .stage9c-help:not(.stage9d-bottom-help) {
+  display: block !important;
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 7px;
+  color: #9aacc9;
+}
+[data-defense-config="true"] .stage9e-in-left .stage9d-bottom-help {
+  display: none !important;
+}
+@media (max-width: 640px) {
+  [data-defense-config="true"] .stage9e-in-left .stage9d-duration-grid {
+    grid-template-columns: minmax(0,1fr) !important;
+  }
+}
+`
+
 export default function InterviewConfigPage() {
   const [resumes, setResumes] = useState<ResumeInfo[]>([])
   const [materials, setMaterials] = useState<MaterialInfo[]>([])
@@ -68,6 +162,61 @@ export default function InterviewConfigPage() {
     return () => { live = false; controller.abort() }
   }, [fetchCounter])
 
+  useEffect(() => {
+    // Align the BOTTOM edges of the two lower cards on desktop.
+    // Because the materials section is taller than the reviewer-style section,
+    // forcing identical card heights would instead misalign their bottoms.
+    const main = document.querySelector<HTMLElement>('[data-defense-config="true"]')
+    const strength = main?.querySelector<HTMLElement>('[data-strength-card="true"]')
+    const materials = main?.querySelector<HTMLElement>('[data-materials-card="true"]')
+    if (!main || !strength) return
+
+    const alignBottomEdges = () => {
+      const timeCard = main.querySelector<HTMLElement>('.stage9e-in-left .stage9c-config')
+      if (!timeCard) return
+
+      // Remove stale heights before measuring the natural minimum height.
+      timeCard.style.removeProperty('min-height')
+      timeCard.style.height = 'auto'
+      if (!window.matchMedia('(min-width: 1024px)').matches) return
+
+      const naturalHeight = Math.ceil(timeCard.getBoundingClientRect().height)
+      const targetHeight = Math.round(
+        strength.getBoundingClientRect().bottom - timeCard.getBoundingClientRect().top,
+      )
+      // Never shrink the controls below their natural content size.
+      if (targetHeight >= naturalHeight) {
+        timeCard.style.height = `${targetHeight}px`
+      }
+    }
+
+    let frame: number | null = null
+    const scheduleAlign = () => {
+      if (frame !== null) return
+      frame = window.requestAnimationFrame(() => {
+        frame = null
+        alignBottomEdges()
+      })
+    }
+
+    // Stage 9E inserts the timer card asynchronously through a React portal.
+    const domObserver = new MutationObserver(scheduleAlign)
+    domObserver.observe(main, { childList: true, subtree: true })
+    const sizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(scheduleAlign)
+      : null
+    sizeObserver?.observe(strength)
+    if (materials) sizeObserver?.observe(materials)
+    window.addEventListener('resize', scheduleAlign)
+    scheduleAlign()
+    return () => {
+      domObserver.disconnect()
+      sizeObserver?.disconnect()
+      window.removeEventListener('resize', scheduleAlign)
+      if (frame !== null) window.cancelAnimationFrame(frame)
+    }
+  }, [])
+
   function toggleMaterial(id: string) {
     setMaterialIds((selected) => selected.includes(id)
       ? selected.filter((value) => value !== id)
@@ -95,7 +244,8 @@ export default function InterviewConfigPage() {
   const control = 'w-full rounded-xl border border-white/15 bg-slate-900 px-3 py-2.5 text-sm text-white focus:border-cyan-400 focus:outline-none'
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 sm:px-6">
+    <main data-defense-config="true" className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 sm:px-6">
+      <style>{durationLayoutCSS}</style>
       <div className="mx-auto max-w-5xl">
         <a href="#dashboard" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-cyan-200">
           <ChevronLeft className="size-4" /> 返回概览
@@ -137,7 +287,7 @@ export default function InterviewConfigPage() {
                 )}
             </section>
 
-            <section className="rounded-2xl border border-white/10 bg-slate-900/75 p-5">
+            <section data-materials-card="true" className="rounded-2xl border border-white/10 bg-slate-900/75 p-5">
               <h2 className="flex items-center gap-2 font-semibold"><Layers className="size-5 text-cyan-300" /> 2. 补充资料（可选）</h2>
               <p className="my-3 text-sm text-slate-400">选中后会在答辩时进行 RAG 检索；最多 10 份。</p>
               {loading ? <p className="text-sm text-slate-400">加载中…</p>
@@ -179,7 +329,7 @@ export default function InterviewConfigPage() {
               </div>
             </section>
 
-            <section className="rounded-2xl border border-white/10 bg-slate-900/75 p-5">
+            <section data-strength-card="true" className="rounded-2xl border border-white/10 bg-slate-900/75 p-5">
               <h2 className="mb-3 font-semibold">4. 答辩强度</h2>
               <label className="block text-sm text-slate-300">
                 初始难度：<strong className="text-cyan-300">{config.initial_difficulty} / 5</strong>
@@ -213,7 +363,7 @@ export default function InterviewConfigPage() {
         <div className="mt-6 rounded-2xl border border-white/10 bg-slate-900/75 p-5">
           <div className="flex items-start gap-2 text-sm text-slate-400">
             <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-300" />
-            <span>点击开始后会向 DeepSeek 发送简历和相关问答信息，并可能消耗 API 额度。尚未配置 Key 时，创建操作可能返回 503；不会生成虚假会话。</span>
+            <span>开始后会向当前配置的模型服务发送所选简历及必要的答辩上下文；使用云端模型可能产生费用，本地 Ollama 则由你的电脑运行。模型不可用时可能返回错误，不会生成虚假会话。</span>
           </div>
           {createError && <p role="alert" className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{createError}</p>}
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">

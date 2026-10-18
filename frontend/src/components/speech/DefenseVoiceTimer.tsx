@@ -89,38 +89,88 @@ function DefenseTimeSetting() {
         .find((item) => item.getClientRects().length > 0)
       const host = form ?? main
       if (!host) { node.remove(); return }
-      // Stage 9D: use the SAME visual width as the existing configure panel.
-      // Some earlier screens have a full-width <main> around a centered max-width form.
-      const hostWidth = host.getBoundingClientRect().width
-      const mainWidth = main?.getBoundingClientRect().width || hostWidth
-      const createCandidate = Array.from((form ?? main ?? document).querySelectorAll<HTMLButtonElement>('button'))
-        .find((button) => /开始答辩|创建答辩|开始面试|创建面试/.test(button.textContent || ''))
-      let matchingWidth: number | null = null
-      if (createCandidate && main) {
-        let ancestor: HTMLElement | null = createCandidate.parentElement
-        while (ancestor && ancestor !== main) {
-          const width = ancestor.getBoundingClientRect().width
-          if (width >= 340 && width < mainWidth - 24) {
-            matchingWidth = matchingWidth === null ? width : Math.max(matchingWidth, width)
+      // Stage 9E: prefer the empty left area underneath the materials selection.
+      // Do not move React-managed panels: only move our OWN portal host node.
+      const findLabel = (pattern: RegExp): HTMLElement | null => {
+        const scope = main ?? form ?? document.body
+        const nodes = Array.from(scope.querySelectorAll<HTMLElement>(
+          'h2,h3,h4,h5,h6,label,legend,p,span,div,strong,small'
+        ))
+        return nodes.find((element) => {
+          if (!element.getClientRects().length || element === node || node.contains(element)) return false
+          const own = Array.from(element.childNodes)
+            .filter((child) => child.nodeType === Node.TEXT_NODE)
+            .map((child) => child.textContent ?? '').join('').trim()
+          return own.length > 0 && own.length < 110 && pattern.test(own)
+        }) ?? null
+      }
+      const difficulty = findLabel(/答辩强度|面试强度|初始难度|答辩难度|自适应程度/)
+      const materials = findLabel(/已选择\s*\d+\s*\/\s*\d+/)
+        ?? findLabel(/(?:补充资料|选择资料|知识库资料|补充材料)/)
+      let leftColumn: HTMLElement | null = null
+      if (materials && difficulty) {
+        // Find the closest two-column layout where materials occupy the left
+        // branch and difficulty the right branch. Never restructure the grid.
+        let parent: HTMLElement | null = materials.parentElement
+        while (parent && parent !== document.body) {
+          if (parent.contains(difficulty)) {
+            const branches = Array.from(parent.children) as HTMLElement[]
+            const left = branches.find((child) => child.contains(materials))
+            const right = branches.find((child) => child.contains(difficulty))
+            if (left && right && left !== right) {
+              const a = left.getBoundingClientRect()
+              const b = right.getBoundingClientRect()
+              if (a.width >= 250 && b.width >= 200 && a.right <= b.left + 12) {
+                leftColumn = left
+                break
+              }
+            }
           }
-          ancestor = ancestor.parentElement
+          parent = parent.parentElement
         }
       }
-      // A <form> may be the actual centered panel; its measured width wins.
-      if (form && form.getBoundingClientRect().width < mainWidth - 24) {
-        matchingWidth = form.getBoundingClientRect().width
-      }
-      node.style.maxWidth = matchingWidth !== null ? `${Math.floor(matchingWidth)}px` : '100%'
-      node.style.marginLeft = 'auto'
-      node.style.marginRight = 'auto'
-      // Prefer immediately before the main action row, otherwise append to the config body.
-      const createButton = form && Array.from(form.querySelectorAll<HTMLButtonElement>('button'))
-        .find((button) => /开始答辩|创建答辩|开始面试|创建面试/.test(button.textContent || ''))
-      const actionRow = createButton?.parentElement
-      const anchor = actionRow && actionRow.parentElement === host ? actionRow : null
-      if (node.parentElement !== host || node.nextElementSibling !== anchor) {
-        if (anchor) host.insertBefore(node, anchor)
-        else if (node.parentElement !== host || node !== host.lastElementChild) host.appendChild(node)
+      if (leftColumn) {
+        // In the existing two-column layout, the left side is shorter. Put both
+        // compact duration controls there instead of below the whole form.
+        node.classList.add('stage9e-in-left')
+        node.style.maxWidth = '100%'
+        node.style.marginLeft = '0'
+        node.style.marginRight = '0'
+        if (node.parentElement !== leftColumn || node !== leftColumn.lastElementChild) {
+          leftColumn.appendChild(node)
+        }
+      } else {
+        // Unknown/custom configuration DOM: keep the last known-good placement.
+        node.classList.remove('stage9e-in-left')
+        const hostWidth = host.getBoundingClientRect().width
+        const mainWidth = main?.getBoundingClientRect().width || hostWidth
+        const createCandidate = Array.from((form ?? main ?? document).querySelectorAll<HTMLButtonElement>('button'))
+          .find((button) => /开始答辩|创建答辩|开始面试|创建面试/.test(button.textContent || ''))
+        let matchingWidth: number | null = null
+        if (createCandidate && main) {
+          let ancestor: HTMLElement | null = createCandidate.parentElement
+          while (ancestor && ancestor !== main) {
+            const width = ancestor.getBoundingClientRect().width
+            if (width >= 340 && width < mainWidth - 24) {
+              matchingWidth = matchingWidth === null ? width : Math.max(matchingWidth, width)
+            }
+            ancestor = ancestor.parentElement
+          }
+        }
+        if (form && form.getBoundingClientRect().width < mainWidth - 24) {
+          matchingWidth = form.getBoundingClientRect().width
+        }
+        node.style.maxWidth = matchingWidth !== null ? `${Math.floor(matchingWidth)}px` : '100%'
+        node.style.marginLeft = 'auto'
+        node.style.marginRight = 'auto'
+        const createButton = form && Array.from(form.querySelectorAll<HTMLButtonElement>('button'))
+          .find((button) => /开始答辩|创建答辩|开始面试|创建面试/.test(button.textContent || ''))
+        const actionRow = createButton?.parentElement
+        const anchor = actionRow && actionRow.parentElement === host ? actionRow : null
+        if (node.parentElement !== host || node.nextElementSibling !== anchor) {
+          if (anchor) host.insertBefore(node, anchor)
+          else if (node.parentElement !== host || node !== host.lastElementChild) host.appendChild(node)
+        }
       }
       if (node.isConnected) setSlot((current) => current === node ? current : node)
     }
@@ -216,8 +266,7 @@ function DefenseTimeSetting() {
       </div>
     </div>
     <p className="stage9c-help stage9d-bottom-help">
-      创建新答辩后两项设置固定到本次会话。总时间到期时选择继续或结束本场；不会自动丢弃答案。
-      已有会话保持原设置。单段语音最多录制约 2 分钟，可分段转写。
+      0 表示不限时；每题换题重计时，整场时间持续计时。仅对新建答辩生效。
     </p>
   </section>, slot)
 }
