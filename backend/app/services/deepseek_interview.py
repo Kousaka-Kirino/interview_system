@@ -1,4 +1,4 @@
-"""单模型 DeepSeek：JSON 格式生成面试题、评分。"""
+"""单模型 DeepSeek：JSON 格式生成答辩题、评分。"""
 
 import json
 
@@ -124,7 +124,7 @@ class InterviewLLM:
         system = (
             reviewer_instruction(style)
             + "\n"
-            "你正在主持基于简历的中文技术模拟面试，"
+            "你正在主持基于简历的中文技术模拟答辩，"
             "只提出一个具体问题。"
             "难度为1至5级。"
             "以简历中的项目、技术和经历为主线，"
@@ -171,7 +171,7 @@ class InterviewLLM:
 
         except Exception as exc:
             raise InterviewLLMError(
-                "模型没有返回有效面试问题"
+                "模型没有返回有效答辩问题"
             ) from exc
 
     def grade_answer(
@@ -183,7 +183,7 @@ class InterviewLLM:
     ) -> GradeResult:
 
         system = (
-            "你是专业技术面试评分员。"
+            "你是专业技术答辩评分员。"
             "根据问题和用户的实际回答给0到100分。"
             "主要考察相关性、正确性、细节"
             "和表达的可验证性；"

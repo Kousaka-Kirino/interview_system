@@ -1,4 +1,4 @@
-"""不依赖 API Key 的面试统计、历史和规则复盘。"""
+"""不依赖 API Key 的答辩统计、历史和规则复盘。"""
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -232,7 +232,7 @@ def build_report(
 
     if not answered:
         suggestions = [
-            "本场面试没有已提交回答，"
+            "本场答辩没有已提交回答，"
             "建议完成至少一题后再查看评分分析。"
         ]
 

@@ -1,4 +1,4 @@
-"""AI 复盘缓存；离线统计直接从面试问答实时计算。"""
+"""AI 复盘缓存；离线统计直接从答辩问答实时计算。"""
 
 from datetime import datetime, timezone
 

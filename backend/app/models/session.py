@@ -1,4 +1,4 @@
-"""模拟面试会话及逐题问答，均保存在 SQLite。"""
+"""模拟答辩会话及逐题问答，均保存在 SQLite。"""
 
 from datetime import datetime, timezone
 

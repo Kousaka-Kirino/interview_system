@@ -76,3 +76,19 @@ def health() -> dict[str, str]:
         "status": "ok",
         "service": "interview-system-api",
     }
+
+# stage7:router - local review and knowledge annotations
+from app.stage7_review import router as stage7_review_router
+app.include_router(stage7_review_router)
+
+# stage8b:auth - local single-owner login barrier
+from app.stage8b_auth import install_auth as stage8b_install_auth
+stage8b_install_auth(app)
+
+# stage8c2:scope - primary-resource ownership checks (single-owner transition)
+from app.stage8c2_guard import install_owner_scope as stage8c2_install_owner_scope
+stage8c2_install_owner_scope(app)
+
+# stage9:voice - local audio transcription router
+from app.stage9_speech import router as stage9_speech_router
+app.include_router(stage9_speech_router)

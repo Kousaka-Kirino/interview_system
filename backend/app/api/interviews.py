@@ -1,4 +1,4 @@
-"""面试配置与自适应规则预览接口。"""
+"""答辩配置与自适应规则预览接口。"""
 
 from fastapi import APIRouter
 
@@ -18,7 +18,7 @@ router = APIRouter(
 
 @router.get("/options")
 def get_interview_options() -> dict:
-    """获取前端面试配置的可选项。"""
+    """获取前端答辩配置的可选项。"""
 
     return {
         "reviewer_styles": [
@@ -74,6 +74,6 @@ def get_interview_options() -> dict:
 def preview_adaptation(
     body: AdaptationPreviewRequest
 ) -> AdaptationPreviewResponse:
-    """仅供开发预览；不创建真实面试会话。"""
+    """仅供开发预览；不创建真实答辩会话。"""
 
     return adjust_difficulty(body)

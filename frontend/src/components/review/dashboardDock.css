@@ -1,0 +1,34 @@
+/* Stage 7C: five responsive metric cards, matching the original navy dashboard. */
+.stage7b-five-tile-grid { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.stage7b-tile-slot { min-width: 0; display: flex; }
+.stage7b-history-button {
+  display: flex !important;
+  flex: 1 1 auto;
+  flex-direction: column;
+  justify-content: space-between;
+  text-align: left;
+  width: 100%;
+  min-height: 116px;
+  cursor: pointer;
+  gap: 9px;
+  border: 1px solid #28354f !important;
+  border-radius: 20px;
+  background-color: #0e172b !important;
+  padding: 25px 26px;
+  color: #f3f6ff !important;
+  box-shadow: 0 2px 8px rgba(2, 6, 23, .12);
+  transition: border-color .2s ease, background-color .2s ease;
+}
+.stage7b-history-button:hover,
+.stage7b-history-button:focus-visible { border-color: #22d3ee !important; background-color: #12223d !important; outline: 2px solid transparent; outline-offset: 2px; }
+.stage7b-history-button:focus-visible { box-shadow: 0 0 0 3px rgba(34,211,238,.35); }
+.stage7b-history-button-active { border-color: #1675b9 !important; background-color: #142542 !important; }
+.stage7b-card-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; width: 100%; font-size: 16px; color: #94a3b8; }
+.stage7b-card-top svg { color: #22d3ee; }
+.stage7b-card-number { display: block; font-weight: 750; font-size: clamp(19px, 2vw, 29px); line-height: 1.2; color: #f3f6ff; }
+.stage7b-card-hint { font-size: 12px; line-height: 1.45; color: #7f90af; }
+.stage7b-history-heading { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; gap: 10px; color: #dbeafe; }
+.stage7b-history-heading button { display: inline-flex; align-items: center; gap: 5px; border-radius: 8px; border: 1px solid #344763; background: #14233d; color: #67e8f9; padding: 7px 12px; font-size: 12px; }
+.stage7b-placement-warning { margin: 12px auto; max-width: 1000px; border-radius: 12px; background: #231c22; padding: 12px; font-size: 12px; color: #fda4af; }
+@media (min-width: 700px) { .stage7b-five-tile-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; } }
+@media (min-width: 1120px) { .stage7b-five-tile-grid { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; } }

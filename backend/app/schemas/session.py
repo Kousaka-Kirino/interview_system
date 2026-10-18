@@ -1,4 +1,4 @@
-"""面试会话相关的请求与响应。"""
+"""答辩会话相关的请求与响应。"""
 
 from datetime import datetime
 from typing import Literal

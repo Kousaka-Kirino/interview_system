@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Clock3,
   RefreshCw,
+  ExternalLink,
   Server,
   TriangleAlert,
 } from 'lucide-react'
@@ -24,7 +25,7 @@ const PAGE_SIZE = 8
 type Filter = InterviewStatus | 'all'
 
 const filters: { value: Filter; label: string }[] = [
-  { value: 'all', label: '全部面试' },
+  { value: 'all', label: '全部答辩' },
   { value: 'active', label: '进行中' },
   { value: 'completed', label: '已完成' },
 ]
@@ -109,6 +110,18 @@ function HistoryRow({ item }: { item: HistoryItem }) {
       <td className="px-5 py-4 text-right font-semibold text-slate-100 tabular-nums">
         {scoreText(item.average_score)}
       </td>
+      <td className="px-5 py-4 text-right">
+        <a
+          href={item.status === 'completed'
+            ? `#report/${encodeURIComponent(item.id)}`
+            : `#session/${encodeURIComponent(item.id)}`}
+          className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-cyan-400/20 px-3 py-2 text-xs font-semibold text-cyan-200 transition hover:bg-cyan-400/10"
+          aria-label={`${item.status === 'completed' ? '查看复盘' : '继续答辩'}：${item.id}`}
+        >
+          {item.status === 'completed' ? '查看复盘' : '继续答辩'}
+          <ExternalLink className="size-3.5" aria-hidden="true" />
+        </a>
+      </td>
     </tr>
   )
 }
@@ -177,8 +190,8 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-300">Interview Studio</p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">AI 模拟面试工作台</h1>
-              <p className="mt-1 text-sm text-slate-400">历史记录与表现概览 · Stage 5A</p>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">AI 模拟答辩工作台</h1>
+              <p className="mt-1 text-sm text-slate-400">历史记录、表现概览与复盘 · Stage 5D</p>
             </div>
           </div>
           <button
@@ -204,7 +217,7 @@ export default function DashboardPage() {
             <div className="flex items-start gap-3">
               <TriangleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-rose-300" />
               <div>
-                <p className="font-semibold text-rose-100">无法获取面试数据</p>
+                <p className="font-semibold text-rose-100">无法获取答辩数据</p>
                 <p className="mt-1 text-sm text-rose-200/90">{error}</p>
               </div>
             </div>
@@ -212,20 +225,20 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <section aria-label="面试统计" className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <SummaryCard label="面试总场次" value={stats?.total_sessions ?? (loading ? '…' : '—')} caption="历史创建的所有会话" icon={ClipboardList} />
+        <section aria-label="答辩统计" className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard label="答辩总场次" value={stats?.total_sessions ?? (loading ? '…' : '—')} caption="历史创建的所有会话" icon={ClipboardList} />
           <SummaryCard label="已完成" value={stats?.completed_sessions ?? (loading ? '…' : '—')} caption="正常完成或提前结束" icon={CheckCircle2} />
           <SummaryCard label="已回答题目" value={stats?.answered_turns ?? (loading ? '…' : '—')} caption="已记录的主问题与追问回答" icon={Activity} />
           <SummaryCard label="历史平均分" value={stats ? scoreText(stats.average_score) : loading ? '…' : '—'} caption="已评分回答均值，仅供练习参考" icon={BookOpenText} />
         </section>
 
-        <section aria-label="历史面试列表" className="mt-10 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80 shadow-2xl shadow-slate-950/20">
+        <section aria-label="历史答辩列表" className="mt-10 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80 shadow-2xl shadow-slate-950/20">
           <div className="flex flex-col gap-5 border-b border-white/10 px-5 py-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-white">历史面试</h2>
+              <h2 className="text-lg font-semibold text-white">历史答辩</h2>
               <p className="mt-1 text-sm text-slate-400">按创建时间排序，可按状态筛选</p>
             </div>
-            <div className="flex flex-wrap gap-2" aria-label="筛选面试状态">
+            <div className="flex flex-wrap gap-2" aria-label="筛选答辩状态">
               {filters.map((entry) => (
                 <button
                   key={entry.value}
@@ -246,14 +259,15 @@ export default function DashboardPage() {
             <div className="px-6 py-16 text-center text-sm text-rose-200">加载失败，请检查上方提示后重试。</div>
           ) : history?.items.length ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[650px] text-left text-sm">
+              <table className="w-full min-w-[780px] text-left text-sm">
                 <thead className="bg-white/[0.025] text-xs tracking-wide text-slate-400">
                   <tr>
                     <th scope="col" className="px-5 py-3 font-medium">创建时间 / 会话</th>
-                    <th scope="col" className="px-5 py-3 font-medium">面试风格</th>
+                    <th scope="col" className="px-5 py-3 font-medium">答辩风格</th>
                     <th scope="col" className="px-5 py-3 font-medium">状态</th>
                     <th scope="col" className="px-5 py-3 text-right font-medium">回答数</th>
                     <th scope="col" className="px-5 py-3 text-right font-medium">平均分</th>
+                    <th scope="col" className="px-5 py-3 text-right font-medium">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -264,9 +278,9 @@ export default function DashboardPage() {
           ) : (
             <div className="px-6 py-16 text-center">
               <ClipboardList aria-hidden="true" className="mx-auto size-10 text-slate-600" />
-              <h3 className="mt-4 font-semibold text-slate-200">暂无符合条件的面试记录</h3>
+              <h3 className="mt-4 font-semibold text-slate-200">暂无符合条件的答辩记录</h3>
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">
-                当前只展示数据库中的真实数据；尚未进行正式面试时，这里为空是正常的。
+                当前只展示数据库中的真实数据；尚未进行正式答辩时，这里为空是正常的。
               </p>
             </div>
           )}
@@ -293,7 +307,7 @@ export default function DashboardPage() {
             </div>
           </footer>
         </section>
-        <p className="mt-8 text-center text-xs text-slate-500">本机单用户开发版本 · 下一阶段：简历与补充资料管理</p>
+        <p className="mt-8 text-center text-xs text-slate-500">本机单用户开发版本 · 复盘默认离线，AI 深度分析需主动触发</p>
       </div>
     </main>
   )

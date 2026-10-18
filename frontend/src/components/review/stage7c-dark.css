@@ -1,0 +1,16 @@
+/* Stage 7C: dark component surface only; never changes global app styles. */
+.stage7c-dark { color-scheme: dark; color: #e8eefc; background-color: #0d172b; }
+.stage7c-dark input:not([type="checkbox"]),
+.stage7c-dark textarea,
+.stage7c-dark select { color-scheme: dark; }
+.stage7c-dark input::placeholder,
+.stage7c-dark textarea::placeholder { color: #8899b8; opacity: 1; }
+.stage7c-dark button:focus-visible,
+.stage7c-dark input:focus-visible,
+.stage7c-dark select:focus-visible,
+.stage7c-dark textarea:focus-visible { outline: 2px solid #22d3ee; outline-offset: 2px; }
+.stage7c-dark button:not(:disabled) { cursor: pointer; }
+.stage7c-dark button:disabled { cursor: not-allowed; }
+.stage7c-dark ::selection { background-color: #155e75; color: #fff; }
+/* Both the dashboard and dialogs inherit the same deep navy palette. */
+.stage7c-dark [role="status"] { overflow-wrap: anywhere; }

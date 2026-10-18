@@ -89,7 +89,7 @@ class InterviewReportView(BaseModel):
     ai_generated_at: datetime | None = None
 
     scoring_note: str = (
-        "评分来自面试阶段模型，"
+        "评分来自答辩阶段模型，"
         "规则版复盘只汇总已有评分，"
         "并非独立能力认证。"
     )

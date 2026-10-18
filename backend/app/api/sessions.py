@@ -1,4 +1,4 @@
-"""Stage 3：创建、查看、回答与提前结束单模型面试。"""
+"""Stage 3：创建、查看、回答与提前结束单模型答辩。"""
 
 import logging
 
@@ -90,7 +90,7 @@ def _get_session(
     if session is None:
         raise HTTPException(
             404,
-            "面试会话不存在",
+            "答辩会话不存在",
         )
 
     return session
@@ -153,12 +153,12 @@ def _llm_question(
     except Exception as exc:
 
         logger.exception(
-            "生成面试问题失败"
+            "生成答辩问题失败"
         )
 
         raise HTTPException(
             503,
-            "面试问题生成失败，请稍后重试",
+            "答辩问题生成失败，请稍后重试",
         ) from exc
 
 
@@ -296,7 +296,7 @@ def submit_answer(
     if session.status != "active":
         raise HTTPException(
             409,
-            "面试已经结束",
+            "答辩已经结束",
         )
 
     if not body.answer.strip():
@@ -314,7 +314,7 @@ def submit_answer(
     ):
         raise HTTPException(
             409,
-            "题目已变化，请刷新面试会话后再提交",
+            "题目已变化，请刷新答辩会话后再提交",
         )
 
     resume = db.get(

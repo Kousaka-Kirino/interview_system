@@ -1,4 +1,4 @@
-"""Stage 4：面试历史、全局统计、离线复盘和按需 AI 复盘。"""
+"""Stage 4：答辩历史、全局统计、离线复盘和按需 AI 复盘。"""
 
 import logging
 
@@ -60,13 +60,13 @@ def completed_session(
     if session is None:
         raise HTTPException(
             status_code=404,
-            detail="面试会话不存在",
+            detail="答辩会话不存在",
         )
 
     if session.status != "completed":
         raise HTTPException(
             status_code=409,
-            detail="面试尚未结束，无法生成最终复盘",
+            detail="答辩尚未结束，无法生成最终复盘",
         )
 
     return session
@@ -171,7 +171,7 @@ def ai_report(
     if not report.turns:
         raise HTTPException(
             status_code=422,
-            detail="本场面试没有已回答题目",
+            detail="本场答辩没有已回答题目",
         )
 
     try:
