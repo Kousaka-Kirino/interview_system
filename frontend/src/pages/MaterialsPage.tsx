@@ -12,6 +12,16 @@ import { materialApi } from '../lib/api'
 import { formatDate, formatSize, messageOf, validateDocument } from '../lib/resources'
 import type { MaterialInfo, MaterialSearchHit } from '../types/resources'
 
+// stage10:pptx-import -- PPTX is for supplementary material uploads only.
+function validateStage10Material(file: File | null): string | null {
+  if (file?.name.toLowerCase().endsWith('.pptx')) {
+    if (file.size === 0) return 'PPTX 文件为空。'
+    if (file.size > 12 * 1024 * 1024) return 'PPTX 大小不能超过 12 MiB。'
+    return null
+  }
+  return validateDocument(file, 12)
+}
+
 export default function MaterialsPage() {
   const [items, setItems] = useState<MaterialInfo[]>([])
   const [refresh, setRefresh] = useState(0)
@@ -57,7 +67,7 @@ export default function MaterialsPage() {
   async function upload() {
     setActionError(null)
     setNotice(null)
-    const invalid = validateDocument(file, 12)
+    const invalid = validateStage10Material(file)
     if (invalid) { setActionError(invalid); return }
     if (!file) return
     setUploading(true)
@@ -138,14 +148,14 @@ export default function MaterialsPage() {
         <section className="rounded-2xl border border-white/10 bg-slate-900 p-6">
           <h2 className="flex items-center gap-2 text-lg font-semibold"><UploadCloud className="size-5 text-cyan-300" /> 上传补充资料</h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            支持 .pdf / .docx，不超过 12 MiB；PDF 最多 150 页，提取文字最多 200,000 字符。首次索引可能需要下载中文 Embedding 模型，耗时较长。
+            支持 .pdf / .docx / .pptx，不超过 12 MiB；PDF 最多 150 页，提取文字最多 200,000 字符。首次索引可能需要下载中文 Embedding 模型，耗时较长。
           </p>
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
             <input
               ref={inputRef}
               type="file"
               aria-label="选择补充资料文件"
-              accept=".pdf,.docx"
+              accept=".pdf,.docx,.pptx"
               disabled={uploading}
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               className="block min-w-0 flex-1 text-sm text-slate-300 file:mr-4 file:rounded-lg file:border-0 file:bg-white/10 file:px-4 file:py-2 file:text-sm file:text-white hover:file:bg-white/15"

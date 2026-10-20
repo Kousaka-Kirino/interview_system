@@ -92,3 +92,7 @@ stage8c2_install_owner_scope(app)
 # stage9:voice - local audio transcription router
 from app.stage9_speech import router as stage9_speech_router
 app.include_router(stage9_speech_router)
+
+# stage10:pptx-import -- reuse existing DOCX material indexing route
+from app.stage10_pptx import router as stage10_pptx_router
+app.include_router(stage10_pptx_router)

@@ -659,3 +659,39 @@ The new configuration value `answer_minutes` (conceptual only; not sent as an AP
 - On user choice to finish the whole defense, the browser calls `POST /api/interviews/{session_id}/finish` (no body), then reloads the session. It does **not** submit any outstanding draft automatically.
 - Timers and configuration are browser-local; there is no new backend API, schema, or server validation of the minute limits.
 <!-- STAGE9D_DUAL_DURATION_END -->
+
+<!-- STAGE9E_COMPACT_LAYOUT_BEGIN -->
+## Stage 9E - Configuration layout integration (no API contract changes)
+
+- Frontend configuration route: `#configure` or `#interview`; timer settings now appear inside the left materials-selection column when the standard two-column DOM is found.
+- The fields are **per-question minutes (0-60, default 2)** and **whole-defense minutes (0-60, default 0)**. `0` disables its corresponding timer.
+- Values continue to use the existing browser localStorage keys and are bound to a newly created session when the route changes to `#session/{id}`. No timer data is added to backend request schemas in this stage.
+- Existing API calls remain unchanged: `POST /api/interviews`, `GET /api/interviews/{session_id}`, `POST /api/interviews/{session_id}/answer`, `POST /api/interviews/{session_id}/finish`, and `POST /api/speech/transcribe`.
+- No database migration or HTTP change is required. The timers remain client-side only; the server does not enforce their expiration.
+<!-- STAGE9E_COMPACT_LAYOUT_END -->
+
+<!-- STAGE9F_BALANCED_LAYOUT_BEGIN -->
+## Stage 9F — 纯前端布局调整
+
+- 本阶段没有新增、删除或修改任何 HTTP API。
+- `POST /api/interviews` 创建会话的 JSON 协议保持不变。
+- `POST /api/speech/transcribe` 语音转文字接口保持不变。
+- 每题计时与整场计时沿用 Stage 9D/9E 的前端设置和会话本地持久化方式；0 表示不限时，允许 0～60 整数。
+- 本阶段只调整原有输入组件的显示排列和自适应高度，仍应验证创建会话及计时没有回归问题。
+<!-- STAGE9F_BALANCED_LAYOUT_END -->
+
+<!-- STAGE10_PPTX_BEGIN -->
+## Stage 10 — PPTX 资料兼容上传接口
+
+| Method | Path | 登录 | 说明 |
+|---|---|---|---|
+| POST | `/api/materials/pptx-import` | 必须 | 上传 `.pptx` 并转换为 DOCX 文字副本，再进入既有资料索引流程 |
+
+- Content-Type：`multipart/form-data`，字段名 `file`；支持 `.pptx`，大小至多 12 MiB，至多 150 张幻灯片及 200,000 个可提取文字字符。
+- 旧格式 `.ppt` 不支持；空白/全图片型 PPTX 不能提取有效文字，返回 422。
+- 成功时返回与既有 `POST /api/materials` 相同的 `MaterialInfo`，状态为 201；`original_filename` 将显示**生成的文字版 `.docx` 文件名**，以避免误认为原始 PPTX 已原样保存。
+- 典型失败：401 未登录；413 文件过大；415 格式不受支持；422 文件损坏或不含可提取文字；原资料上传服务的其他错误码会原样返回。
+- 原有 `GET /api/materials`、`POST /api/materials/search`、`DELETE /api/materials/{material_id}` 无契约改动；仍使用材料 ID 检索与删除。
+- 文本页码以“第 N 页”标题写入转换文本。检索结果的 `chunk_index` 是文本分块编号，**不能直接当作幻灯片页码**。
+- 导入过程中仅处理文字，不解析图片和图表，不存储原始 PPTX 文件；转换过程只在请求期间占用内存。
+<!-- STAGE10_PPTX_END -->

@@ -711,3 +711,41 @@ Stage 8C-3：根据实际业务模型逐接口实现列表/统计过滤和上传
 - Install requires the exact delivered Stage 9C frontend files, backs up all touched files, runs `npm.cmd run build`, and restores on build failure. No backend/database/Whisper/Ollama changes.
 - Manual checks: 0/1/60 on each input, widths at large/narrow viewport, question change, page refresh, simultaneous expiry, finish failure, and historical session fallback.
 <!-- STAGE9D_DUAL_DURATION_END -->
+
+<!-- STAGE9E_COMPACT_LAYOUT_BEGIN -->
+## Stage 9E - Place defense timing settings into the left gap
+
+- The `#configure` screen now places the two duration inputs beneath the supplementary-material selector in the **left configuration column**, adjacent to the difficulty card. This removes the wasted blank area seen at desktop width and avoids rendering an extra full-width panel beneath the start button.
+- Existing colors are unchanged: deep navy background, subtle slate borders, cyan accents; both controls are compact and remain legible on narrow layouts.
+- No countdown algorithm changes: per-question default 2 minutes, whole-session default unlimited, both accept integers 0-60 where 0 means unlimited. Only new sessions acquire new preferences; existing session timers and localStorage keys remain intact.
+- The installer edits only `frontend/src/components/speech/DefenseVoiceTimer.tsx` and `frontend/src/components/speech/speechTimer.css`; it does not replace `InterviewConfigPage.tsx`, nor change FastAPI, SQLite, Chroma, Whisper, Ollama, or authentication.
+- Mounting strategy: find the supplementary-material selector and defense difficulty section, locate their two-column layout, and insert the *owned portal host only* into the left column. Do not relocate React-owned form elements. If the expected structure is absent, preserve the previous centered placement.
+- Installation saves exact source and Markdown backups, verifies the Stage 9D hashes before editing, runs `npm.cmd run build`, and automatically attempts rollback when build fails.
+- Acceptance: the time controls appear under material selection, the difficulty card remains on the right, the form submit remains usable, narrow layouts stack neatly, and question/whole-session timers retain their prior behavior.
+<!-- STAGE9E_COMPACT_LAYOUT_END -->
+
+<!-- STAGE9F_BALANCED_LAYOUT_BEGIN -->
+## Stage 9F — 答辩配置双列底部对齐
+
+- 修改范围：`frontend/src/pages/InterviewConfigPage.tsx`；不修改 FastAPI、认证、Whisper、计时存储逻辑或数据库。
+- 左列仍展示简历、补充资料，下面是答辩时间设置；右列仍是评委风格、答辩强度。
+- 每题时间和本场总时间在同一个大卡片内横向排列，解释文字位于各自输入区域内。
+- 宽屏时根据答辩强度卡片下沿动态调整左侧时间卡片高度，尽量使两列底部齐平；若资料内容过多、空间不足则不裁切时间输入。
+- 窄屏改为自然高度和自适应单列，防止遮挡。
+- 安装命令：解压 `stage9f_balanced_layout_release.zip`，运行 `install-stage9f.ps1 -ProjectRoot <工程根目录>`；自动备份、构建与失败回滚。可通过 `restore-stage9f.ps1` 手动恢复。
+- 验收：打开 `http://127.0.0.1:5173/#configure`，确认时间控件横排，两个字段均可输入 0～60，开始答辩后计时规则未变。
+<!-- STAGE9F_BALANCED_LAYOUT_END -->
+
+<!-- STAGE10_PPTX_BEGIN -->
+## Stage 10 — PPTX 补充资料上传与 RAG 检索
+
+- 本阶段新增 PPTX 文字提取兼容入口，不修改既有 SQLite 表和 Chroma 集合结构。
+- 前端资料管理允许选择 `.pptx`；PDF/DOCX 上传路径保持原样。
+- 新增 `POST /api/materials/pptx-import`，仅限已登录用户；服务端限制 12 MiB、150 页、200,000 字符，并拒绝异常 ZIP 文件结构。
+- 服务端按演示文稿定义的页面顺序提取可选择文字，为每页写入“第 N 页”标签，再生成 DOCX 文字提取副本，转入现有 `/api/materials` 上传、文本切片、嵌入及 Chroma 索引流程。
+- **重要：这是第一版 PPTX 文字兼容导入**。知识库储存的是 `原名_PPTX文字提取版.docx`，不是原始 PPTX；图片、扫描截图、图表、公式、视频和动画不在本版 OCR 范围。旧 `.ppt` 请先在 PowerPoint 或 LibreOffice 中另存为 `.pptx`。
+- 原始 PDF/DOCX 资料与原有用户、登录及知识库过滤逻辑保持不变；PPTX 导入使用既有受认证保护的 DOCX 上传流程，不绕过所有权校验。
+- 如原 PPTX 有重要示意图，建议额外准备文字讲稿或导出有可选择文本的 PDF。
+- 测试：运行 `python tests/test_stage10_pptx.py backend`（在本阶段安装包根目录，使用项目 venv 解释器）；前端在 `frontend/` 执行 `npm.cmd run build`。
+- 安装要求：先停止 FastAPI；脚本会自动备份全部改动源码与两份 Markdown 文档；失败尝试回滚。不会修改 `.env`、原有数据库、向量库、用户资料或 Ollama。
+<!-- STAGE10_PPTX_END -->
