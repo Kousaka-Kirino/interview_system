@@ -58,6 +58,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# stage10d:pptx-direct-route -- avoid collision with material-id permission checks
+from app.stage10_pptx import import_pptx as stage10d_import_pptx
+app.add_api_route(
+    "/api/pptx-import", stage10d_import_pptx, methods=["POST"],
+    status_code=201, tags=["materials-pptx"],
+)
+
 # 原有接口
 app.include_router(interviews_router)
 app.include_router(resumes_router)
