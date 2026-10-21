@@ -11,7 +11,9 @@ import hmac
 import ipaddress
 import json
 import os
+import re
 import secrets
+from uuid import uuid4
 import sqlite3
 import time
 from contextlib import contextmanager
@@ -28,7 +30,7 @@ TOKEN_LIFETIME_SECONDS = 12 * 60 * 60
 SCHEME = "scrypt-n32768-r8-p1"
 _ROUTER = APIRouter(prefix="/api/auth", tags=["Account authentication"])
 _MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
-_NO_LOGIN = {"/api/auth/login", "/api/auth/me", "/api/auth/logout", "/api/auth/change-password"}
+_NO_LOGIN = {"/api/auth/login", "/api/auth/register", "/api/auth/me", "/api/auth/logout", "/api/auth/change-password"}
 _LIMIT = 5
 _BLOCK_SECONDS = 10 * 60
 
@@ -92,10 +94,7 @@ def _check_password(password: str, user: sqlite3.Row) -> bool:
 
 
 def _owner(db: sqlite3.Connection) -> sqlite3.Row | None:
-    # Stage 8B refuses a second account. Stage 8C is the point at which this changes.
-    count = db.execute("SELECT COUNT(*) FROM app_users").fetchone()[0]
-    if count != 1:
-        raise RuntimeError("Stage 8B requires exactly the Stage 8A initial owner; registrations are disabled.")
+    """Preserve the original account; no longer enforce single-account count."""
     return db.execute("SELECT * FROM app_users WHERE username = 'aslan' COLLATE NOCASE AND is_active = 1").fetchone()
 
 
@@ -113,12 +112,12 @@ def _session(db: sqlite3.Connection, token: str | None) -> sqlite3.Row | None:
         return None
     return db.execute("""SELECT u.*, s.token_hash FROM app_auth_sessions s
         JOIN app_users u ON u.id=s.user_id
-        WHERE s.token_hash=? AND s.expires_at>? AND u.username='aslan' COLLATE NOCASE AND u.is_active=1""",
+        WHERE s.token_hash=? AND s.expires_at>? AND u.is_active=1""",
         (digest, int(time.time()))).fetchone()
 
 
 def _response_user(row: sqlite3.Row) -> dict[str, Any]:
-    return {"username": row["username"], "must_change_password": bool(row["must_change_password"]), "registration_enabled": False}
+    return {"username": row["username"], "must_change_password": bool(row["must_change_password"]), "registration_enabled": True}
 
 
 def _json_error(status: int, msg: str) -> JSONResponse:
@@ -209,7 +208,6 @@ def _payload(data: Any, fields: tuple[str, ...]) -> dict[str, str]:
 def me(request: Request):
     try:
         with _connect() as db:
-            _owner(db)
             row = _session(db, request.cookies.get(COOKIE))
             if row is None:
                 raise HTTPException(401, "尚未登录。")
@@ -218,6 +216,91 @@ def me(request: Request):
             return response
     except (sqlite3.Error, RuntimeError):
         raise HTTPException(503, "账号数据库尚未准备好。")
+
+
+def _compatible_insert(db: sqlite3.Connection, table: str, fields: dict[str, object]) -> None:
+    """Support Stage 8A schema variants without creating or replacing auth tables."""
+    assert table in {"app_users", "app_user_profiles"}
+    columns = db.execute(f"PRAGMA table_info({table})").fetchall()
+    if not columns:
+        raise RuntimeError(f"Missing local account table: {table}")
+    names = {row["name"] for row in columns}
+    for required in fields:
+        if required not in names:
+            raise RuntimeError(f"Missing column {table}.{required}")
+    for row in columns:
+        if row["name"] not in fields and row["notnull"] and not row["pk"] and row["dflt_value"] is None:
+            raise RuntimeError(f"Unsupported required account column: {table}.{row['name']}")
+    ordered = list(fields)
+    quoted = ", ".join('"' + item + '"' for item in ordered)
+    params = ", ".join("?" for _ in ordered)
+    db.execute(f"INSERT INTO {table} ({quoted}) VALUES ({params})", tuple(fields[item] for item in ordered))
+
+
+@_ROUTER.post("/register", status_code=201)
+async def register(request: Request):
+    """Local-only signup; every new account receives a different on-disk workspace."""
+    try:
+        info = _payload(await request.json(), ("username", "password"))
+    except (ValueError, json.JSONDecodeError):
+        raise HTTPException(400, "请求格式不正确。")
+    username = info["username"].strip().lower()
+    password = info["password"]
+    if not re.fullmatch(r"[a-z0-9_]{3,32}", username) or username == "aslan":
+        raise HTTPException(422, "用户名需为 3～32 位小写英文字母、数字或下划线，且不能使用保留账号。")
+    if not 12 <= len(password) <= 128 or len(password.encode("utf-8")) > 128:
+        raise HTTPException(422, "密码需至少 12 位，且 UTF-8 编码不能超过 128 字节。")
+    if password.lower() in {"password1234", "123456789012", username}:
+        raise HTTPException(422, "密码过于简单，请使用更强的密码。")
+    user_id = str(uuid4())
+    salt = base64.b64encode(os.urandom(16)).decode("ascii")
+    hashed = _hash_password(password, salt)
+    now = int(time.time())
+    from app.stage11_local import user_root
+    workspace = user_root(user_id)
+    try:
+        with _connect() as db:
+            if db.execute("SELECT 1 FROM app_users WHERE username=? COLLATE NOCASE", (username,)).fetchone():
+                raise HTTPException(409, "用户名已被使用。")
+            # Create a per-account workspace BEFORE inserting a usable account.
+            from app.core.database import ensure_user_database
+            ensure_user_database(user_id)
+            user_columns = {r["name"] for r in db.execute("PRAGMA table_info(app_users)")}
+            user_data = {
+                "id": user_id, "username": username,
+                "password_hash": hashed, "password_salt": salt,
+                "password_scheme": SCHEME, "must_change_password": 0, "is_active": 1,
+            }
+            if "created_at" in user_columns:
+                user_data["created_at"] = now
+            if "updated_at" in user_columns:
+                user_data["updated_at"] = now
+            _compatible_insert(db, "app_users", user_data)
+            profile_columns = {r["name"] for r in db.execute("PRAGMA table_info(app_user_profiles)")}
+            profile_data = {"user_id": user_id, "display_name": username, "email": ""}
+            if "created_at" in profile_columns:
+                profile_data["created_at"] = now
+            if "updated_at" in profile_columns:
+                profile_data["updated_at"] = now
+            _compatible_insert(db, "app_user_profiles", profile_data)
+            token, digest = _session_token()
+            db.execute("INSERT INTO app_auth_sessions(token_hash,user_id,created_at,expires_at) VALUES(?,?,?,?)",
+                       (digest, user_id, now, now + TOKEN_LIFETIME_SECONDS))
+            response = JSONResponse({"username": username, "must_change_password": False,
+                                     "registration_enabled": True}, status_code=201)
+            _set_cookie(response, token, request)
+            return response
+    except sqlite3.IntegrityError as exc:
+        # If user creation was rolled back, remove only this new user workspace.
+        import shutil
+        shutil.rmtree(workspace, ignore_errors=True)
+        raise HTTPException(409, "用户名已被使用或账号数据冲突。") from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        import shutil
+        shutil.rmtree(workspace, ignore_errors=True)
+        raise HTTPException(503, "本地账号创建失败，请检查 SQLite 数据库结构与磁盘空间。") from exc
 
 
 @_ROUTER.post("/login")
@@ -234,13 +317,11 @@ async def login(request: Request):
     now = int(time.time())
     try:
         with _connect() as db:
-            user = _owner(db)
-            if user is None:
-                raise HTTPException(503, "初始用户尚未创建。")
+            user = db.execute("SELECT * FROM app_users WHERE username=? COLLATE NOCASE AND is_active=1", (username,)).fetchone()
             state = db.execute("SELECT failures, first_failure, blocked_until FROM app_auth_attempts WHERE key=?", (key,)).fetchone()
             if state and state["blocked_until"] > now:
                 raise HTTPException(429, "尝试次数过多，请十分钟后重试。")
-            valid = username == "aslan" and _check_password(info["password"], user)
+            valid = user is not None and _check_password(info["password"], user)
             if not valid:
                 if state and now - state["first_failure"] < _BLOCK_SECONDS:
                     count, first = state["failures"] + 1, state["first_failure"]
@@ -294,7 +375,7 @@ async def change_password(request: Request):
             db.execute("INSERT INTO app_auth_sessions(token_hash,user_id,created_at,expires_at) VALUES (?,?,?,?)",
                        (digest, user["id"], now, now + TOKEN_LIFETIME_SECONDS))
             db.commit()
-            response = JSONResponse({"username": user["username"], "must_change_password": False, "registration_enabled": False})
+            response = JSONResponse({"username": user["username"], "must_change_password": False, "registration_enabled": True})
             _set_cookie(response, token, request)
             return response
     except (sqlite3.Error, RuntimeError):
@@ -320,9 +401,8 @@ def require_owner_id(request: Request) -> str:
     """Resolve ownership from the server session; never accept a client user_id."""
     try:
         with _connect() as db:
-            owner = _owner(db)  # Remain fail-closed if another account is added.
             row = _session(db, request.cookies.get(COOKIE))
-            if row is None or owner is None:
+            if row is None:
                 raise HTTPException(401, "请先登录。")
             if row["must_change_password"]:
                 raise HTTPException(403, "请先完成首次密码设置。")

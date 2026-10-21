@@ -21,7 +21,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.core.config import Settings, get_settings
+from app.core.config import Settings
+from app.stage11_local import get_user_settings
 from app.core.database import get_db
 
 from app.models.material import Material
@@ -67,7 +68,7 @@ ALLOWED_EXTENSIONS = {
 async def upload_material(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    settings: Settings = Depends(get_settings),
+    settings: Settings = Depends(get_user_settings),
     store: VectorStore = Depends(get_vector_store),
 ) -> Material:
 
@@ -346,7 +347,7 @@ async def search_materials(
 async def delete_material(
     material_id: str,
     db: Session = Depends(get_db),
-    settings: Settings = Depends(get_settings),
+    settings: Settings = Depends(get_user_settings),
     store: VectorStore = Depends(get_vector_store),
 ) -> Response:
 

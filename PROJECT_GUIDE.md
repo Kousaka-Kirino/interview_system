@@ -759,3 +759,9 @@ Stage 8C-3：根据实际业务模型逐接口实现列表/统计过滤和上传
 旧地址 `/api/materials/pptx-import` 保留供兼容，但前端不再调用；不要在「简历管理」页上传 PPTX。原始 PPTX 不保存；图表及图片不执行 OCR。
 
 安装器会备份源码、检查真实 FastAPI 应用中存在独立的 POST 路由，并编译前端。失败自动回滚。
+
+
+## Stage 11 - Local account registration
+
+Local signup, user-specific SQLite/upload/Chroma workspaces, authentication and rollback details:
+See `docs/STAGE11_LOCAL_REGISTRATION.md`.

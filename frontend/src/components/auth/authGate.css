@@ -42,3 +42,8 @@
 .stage8c-profile-card h3 { font-size: 16px; margin: 0; color: #e8eefc; }
 .stage8c-profile-note { margin: 0 0 6px; color: #94a3b8; font-size: 12px; line-height: 1.7; }
 .stage8c-profile-success { padding: 10px 12px; margin: 0 0 14px; border-radius: 8px; color: #a7f3d0; background: #064e3b66; font-size: 13px; }
+
+/* Stage 11 local registration toggle */
+.stage11-mode-switch { width:100%; border:1px solid #334560; border-radius:10px; background:transparent; color:#67e8f9; padding:10px; font-size:13px; cursor:pointer; }
+.stage11-mode-switch:hover:not(:disabled) { background:#153452; }
+.stage11-mode-switch:disabled { opacity:.6; cursor:wait; }

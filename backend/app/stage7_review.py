@@ -18,6 +18,7 @@ from typing import Any, Iterator, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from app.stage8b_auth import require_owner_id, _connect as require_owner_database
+from app.stage11_local import is_legacy_owner, user_root
 
 router = APIRouter(prefix="/api/study", tags=["Knowledge review"])
 
@@ -74,6 +75,7 @@ def _database() -> Iterator[sqlite3.Connection]:
         db.execute("""
             CREATE TABLE IF NOT EXISTS study_knowledge_points (
                 id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
                 session_id TEXT,
                 material_id TEXT,
                 source_name TEXT NOT NULL,
@@ -290,16 +292,19 @@ def search_knowledge(
     """
     # The legacy Chroma folder belongs only to the original owner (Stage 8A ledger).
     # Never enable this endpoint for additional accounts without per-user collections.
-    with require_owner_database() as owner_db:
-        legacy = owner_db.execute("SELECT owner_user_id FROM app_vector_ownership").fetchall()
-        if (not legacy and _storage_path("CHROMA_PATH", "storage/chroma").is_dir()) or any(row[0] != user_id for row in legacy):
-            raise HTTPException(403, "知识库归属不符，检索已拒绝。")
+    if is_legacy_owner(user_id):
+        with require_owner_database() as owner_db:
+            legacy = owner_db.execute("SELECT owner_user_id FROM app_vector_ownership").fetchall()
+            if (not legacy and _storage_path("CHROMA_PATH", "storage/chroma").is_dir()) or any(row[0] != user_id for row in legacy):
+                raise HTTPException(403, "知识库归属不符，检索已拒绝。")
+        storage = _storage_path("CHROMA_PATH", "storage/chroma")
+    else:
+        storage = user_root(user_id) / "chroma"
     try:
         import chromadb
     except ImportError:
         return {"items": [], "status": "unavailable", "message": "缺少 chromadb；仍可手动录入知识片段"}
 
-    storage = _storage_path("CHROMA_PATH", "storage/chroma")
     if not storage.is_dir():
         return {"items": [], "status": "empty", "message": "当前知识库尚无持久化索引，可手动录入"}
     try:

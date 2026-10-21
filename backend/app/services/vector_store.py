@@ -6,6 +6,8 @@ ChromaDB 持久化 + 本地 BGE Embedding。
 """
 
 from functools import lru_cache
+from fastapi import Request
+from app.stage11_local import get_user_settings
 
 from app.core.config import Settings, get_settings
 from app.schemas.material import MaterialHit
@@ -192,6 +194,12 @@ class VectorStore:
         )
 
 
-@lru_cache
-def get_vector_store() -> VectorStore:
-    return VectorStore(get_settings())
+@lru_cache(maxsize=128)
+def _store_for_path(chroma_dir: str, model_id: str) -> VectorStore:
+    settings = get_settings().model_copy(update={"chroma_path": chroma_dir, "embedding_model": model_id})
+    return VectorStore(settings)
+
+
+def get_vector_store(request: Request) -> VectorStore:
+    scoped = get_user_settings(request)
+    return _store_for_path(str(scoped.chroma_dir), scoped.embedding_model)

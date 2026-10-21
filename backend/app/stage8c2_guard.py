@@ -8,12 +8,14 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from contextlib import closing
 from urllib.parse import parse_qs
 
 from fastapi import HTTPException, Request
 from starlette.responses import JSONResponse
 
 from app.stage8b_auth import require_owner_id, _connect
+from app.stage11_local import is_legacy_owner, user_root
 
 _RESOURCE_PATH = re.compile(r"^/api/(resumes|materials|interviews)/([^/]+)(?:/|$)")
 _RESOURCE_KIND = {"resumes": "resume", "materials": "material", "interviews": "session"}
@@ -58,12 +60,29 @@ def _verify_references(refs: list[tuple[str, str]], request: Request):
         return None
     try:
         uid = _owner_or_error(request)
-        with _connect() as db:
-            if not db.execute("SELECT 1 FROM app_stage8c2_meta WHERE name='multiuser_enabled' AND value='0'").fetchone():
-                return _response(503, "多账号隔离尚未开放，请停止该请求")
-            for kind, rid in refs:
-                if not _owned(db, kind, rid, uid):
-                    return _response(404, "资源不存在或无权访问")
+        if is_legacy_owner(uid):
+            with _connect() as db:
+                # Preserve the original aslan resource ledger and strict fail-closed checks.
+                if not db.execute("SELECT 1 FROM app_stage8c2_meta WHERE name='multiuser_enabled' AND value='0'").fetchone():
+                    return _response(503, "初始账号资料隔离配置异常。")
+                for kind, rid in refs:
+                    if not _owned(db, kind, rid, uid):
+                        return _response(404, "资源不存在或无权访问")
+        else:
+            # New accounts have their own SQLite database. Never look up an ID
+            # in the original owner's database, even on accidental ID collisions.
+            from sqlite3 import connect
+            target = user_root(uid) / "interview.db"
+            if not target.is_file():
+                return _response(503, "当前账户的数据目录未初始化。")
+            with closing(connect(target.as_uri() + "?mode=ro", uri=True, timeout=8)) as db:
+                tables = {"resume": "resumes", "material": "materials", "session": "interview_sessions"}
+                for kind, rid in refs:
+                    if not rid or len(rid) > 150 or kind not in tables:
+                        return _response(404, "资源不存在或无权访问")
+                    table = tables[kind]
+                    if db.execute(f'SELECT 1 FROM "{table}" WHERE id=? LIMIT 1', (rid,)).fetchone() is None:
+                        return _response(404, "资源不存在或无权访问")
     except HTTPException as exc:
         return _response(exc.status_code, str(exc.detail))
     except (sqlite3.Error, RuntimeError):
@@ -103,7 +122,8 @@ class OwnerScopeMiddleware:
         match = _RESOURCE_PATH.match(path)
         if match:
             section, rid = match.groups()
-            if section != "interviews" or rid not in _INTERVIEW_STATIC:
+            if not ((section == "interviews" and rid in _INTERVIEW_STATIC)
+                    or (section == "materials" and rid in {"pptx-import", "search"})):
                 refs.append((_RESOURCE_KIND[section], rid))
         if path == "/api/study/search" and method == "GET":
             args = parse_qs(scope.get("query_string", b"").decode("utf-8", errors="replace"))

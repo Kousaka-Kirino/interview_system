@@ -704,3 +704,9 @@ The new configuration value `answer_minutes` (conceptual only; not sent as an AP
 - 保留旧兼容地址 `/api/materials/pptx-import`，但它可能与资料 ID 处理路径冲突，前端不使用。
 - 非法或损坏文件、文件过大、旧版 `.ppt` 仍由 Stage 10 原有校验拒绝。
 - 不更改数据库结构；转换版 DOCX 被保存，原始 PPTX 不保留。
+
+
+## Stage 11 - Local account registration
+
+Local signup, user-specific SQLite/upload/Chroma workspaces, authentication and rollback details:
+See `docs/STAGE11_LOCAL_REGISTRATION.md`.

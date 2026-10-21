@@ -9,7 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.core.config import Settings, get_settings
+from app.core.config import Settings
+from app.stage11_local import get_user_settings
 from app.core.database import get_db
 from app.models.resume import Resume
 from app.schemas.resume import ResumeDetail, ResumeListItem
@@ -32,7 +33,7 @@ def _resume_or_404(resume_id: str, db: Session) -> Resume:
 async def upload_resume(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    settings: Settings = Depends(get_settings),
+    settings: Settings = Depends(get_user_settings),
 ) -> Resume:
     # 文件名仅用于展示；持久化时使用 UUID 文件名，防止路径穿越。
     original_name = Path((file.filename or "").replace("\\", "/")).name
@@ -95,7 +96,7 @@ def get_resume(resume_id: str, db: Session = Depends(get_db)) -> Resume:
 def delete_resume(
     resume_id: str,
     db: Session = Depends(get_db),
-    settings: Settings = Depends(get_settings),
+    settings: Settings = Depends(get_user_settings),
 ) -> Response:
     resume = _resume_or_404(resume_id, db)
     saved_path = settings.uploads_dir / "resumes" / resume.stored_filename

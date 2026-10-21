@@ -4,7 +4,7 @@ import type { FormEvent } from 'react'
 import './authGate.css'
 
 type Account = { username: string; must_change_password: boolean; registration_enabled: boolean }
-type Mode = 'checking' | 'login' | 'change' | 'ready' | 'offline'
+type Mode = 'checking' | 'login' | 'register' | 'change' | 'ready' | 'offline'
 type Profile = { user_id: string; username: string; display_name: string; email: string; email_verified: boolean }
 
 async function api(path: string, payload?: Record<string, string>): Promise<Account | { ok: boolean }> {
@@ -45,6 +45,8 @@ export default function AuthGate() {
   const [password, setPassword] = useState('')
   const [nextPassword, setNextPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
+  const [registerPassword, setRegisterPassword] = useState('')
+  const [registerConfirm, setRegisterConfirm] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
@@ -140,6 +142,27 @@ export default function AuthGate() {
       if (result.must_change_password) setMode('change')
       else window.location.reload()
     } catch (cause) { setError(cause instanceof Error ? cause.message : '登录失败。') }
+    finally { setBusy(false) }
+  }
+
+  async function registerLocal(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (busy) return
+    const name = username.trim().toLowerCase()
+    if (!/^[a-z0-9_]{3,32}$/.test(name) || name === 'aslan') {
+      setError('用户名需为 3～32 位小写英文字母、数字或下划线，且不能使用保留账号。'); return
+    }
+    if (registerPassword.length < 12 || new TextEncoder().encode(registerPassword).length > 128) {
+      setError('密码至少 12 位且不能超过 128 字节。'); return
+    }
+    if (registerPassword !== registerConfirm) { setError('两次输入的密码不一致。'); return }
+    setBusy(true); setError('')
+    try {
+      await api('register', { username: name, password: registerPassword })
+      clearSavedSession()
+      setPassword(''); setRegisterPassword(''); setRegisterConfirm('')
+      window.location.hash = '#dashboard'
+      window.location.reload()
+    } catch (cause) { setError(cause instanceof Error ? cause.message : '注册失败。') }
     finally { setBusy(false) }
   }
 
@@ -239,7 +262,7 @@ export default function AuthGate() {
       <div className="stage8b-brand-mark">D2</div>
       <p className="stage8b-eyebrow">DEFENSE TRAINING</p>
       <h1>AI 答辩训练系统</h1>
-      <p className="stage8b-intro">登录你的个人答辩训练空间。历史资料和知识标记已绑定初始账户 aslan。</p>
+      <p className="stage8b-intro">在这台电脑上登录或注册个人答辩空间。原有 aslan 账号及历史资料保持不变，新账号使用独立的本地数据目录。</p>
       {mode === 'checking' && <div className="stage8b-status" role="status">正在验证登录状态…</div>}
       {mode === 'offline' && <div className="stage8b-fields">
         <p className="stage8b-message stage8b-error" role="alert">{error || '无法连接账号服务。'}</p>
@@ -252,7 +275,20 @@ export default function AuthGate() {
         <input id="stage8b-password" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required />
         {error && <p className="stage8b-message stage8b-error" role="alert">{error}</p>}
         <button className="stage8b-primary" type="submit" disabled={busy}>{busy ? '验证中…' : '登录'}</button>
-        <p className="stage8b-hint">当前仅开放初始账户，暂不开放新用户注册。</p>
+        <button className="stage11-mode-switch" type="button" disabled={busy} onClick={() => { setMode('register'); setUsername(''); setPassword(''); setError('') }}>没有账号？在本机注册</button>
+        <p className="stage8b-hint">账号仅创建在本机，其他电脑无法直接登录本机账号。</p>
+      </form>}
+      {mode === 'register' && <form className="stage8b-fields" onSubmit={(event) => void registerLocal(event)}>
+        <label htmlFor="stage11-username">新用户名（3～32 位英文字母、数字或下划线）</label>
+        <input id="stage11-username" autoComplete="username" value={username} onChange={event => setUsername(event.target.value)} minLength={3} maxLength={32} required />
+        <label htmlFor="stage11-password">设置密码（至少 12 位）</label>
+        <input id="stage11-password" type="password" autoComplete="new-password" value={registerPassword} onChange={event => setRegisterPassword(event.target.value)} minLength={12} required />
+        <label htmlFor="stage11-confirm">确认密码</label>
+        <input id="stage11-confirm" type="password" autoComplete="new-password" value={registerConfirm} onChange={event => setRegisterConfirm(event.target.value)} minLength={12} required />
+        {error && <p className="stage8b-message stage8b-error" role="alert">{error}</p>}
+        <button className="stage8b-primary" type="submit" disabled={busy}>{busy ? '创建账号中…' : '创建本地账号'}</button>
+        <button className="stage11-mode-switch" type="button" disabled={busy} onClick={() => { setMode('login'); setUsername('aslan'); setRegisterPassword(''); setRegisterConfirm(''); setError('') }}>已有账号？返回登录</button>
+        <p className="stage8b-hint">新账号的简历、PPT、答辩记录与向量索引单独存放在本地；请妥善保管密码，当前没有邮箱找回功能。</p>
       </form>}
       {mode === 'change' && <form className="stage8b-fields" onSubmit={(event) => void changePassword(event)}>
         <p className="stage8b-message stage8b-warning">首次登录必须更换初始密码。新密码至少 12 位。</p>
@@ -265,7 +301,7 @@ export default function AuthGate() {
         {error && <p className="stage8b-message stage8b-error" role="alert">{error}</p>}
         <button className="stage8b-primary" type="submit" disabled={busy}>{busy ? '保存中…' : '设置新密码并进入工作台'}</button>
       </form>}
-      <p className="stage8b-footer">本机模式 · SQLite 安全会话 · 暂不开放注册</p>
+      <p className="stage8b-footer">本机模式 · SQLite 账号 · 新用户独立资料空间</p>
     </div>
   </div>
 }
