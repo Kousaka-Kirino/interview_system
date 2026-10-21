@@ -749,3 +749,13 @@ Stage 8C-3：根据实际业务模型逐接口实现列表/统计过滤和上传
 - 测试：运行 `python tests/test_stage10_pptx.py backend`（在本阶段安装包根目录，使用项目 venv 解释器）；前端在 `frontend/` 执行 `npm.cmd run build`。
 - 安装要求：先停止 FastAPI；脚本会自动备份全部改动源码与两份 Markdown 文档；失败尝试回滚。不会修改 `.env`、原有数据库、向量库、用户资料或 Ollama。
 <!-- STAGE10_PPTX_END -->
+
+
+<!-- stage10d-pptx-route-fix -->
+## Stage 10D：PPTX 上传 404 兼容修复
+
+补充资料中的 `.pptx` 由前端向 `POST /api/pptx-import` 发送 multipart/form-data，字段 `file`。该直接注册的路由复用 Stage 10 的 PPTX 文本解析、`require_owner_id(request)` 登录校验，并通过已有 `POST /api/materials` 保存衍生 DOCX 及建立知识库索引。
+
+旧地址 `/api/materials/pptx-import` 保留供兼容，但前端不再调用；不要在「简历管理」页上传 PPTX。原始 PPTX 不保存；图表及图片不执行 OCR。
+
+安装器会备份源码、检查真实 FastAPI 应用中存在独立的 POST 路由，并编译前端。失败自动回滚。

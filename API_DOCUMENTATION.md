@@ -695,3 +695,12 @@ The new configuration value `answer_minutes` (conceptual only; not sent as an AP
 - 文本页码以“第 N 页”标题写入转换文本。检索结果的 `chunk_index` 是文本分块编号，**不能直接当作幻灯片页码**。
 - 导入过程中仅处理文字，不解析图片和图表，不存储原始 PPTX 文件；转换过程只在请求期间占用内存。
 <!-- STAGE10_PPTX_END -->
+
+
+<!-- stage10d-pptx-route-fix -->
+## Stage 10D：PPTX text import endpoint
+
+- `POST /api/pptx-import`（`multipart/form-data`，字段 `file`，要求已登录）：上传 `.pptx` 文本型演示文稿；转换为含页码的 DOCX，复用已有资料索引。
+- 保留旧兼容地址 `/api/materials/pptx-import`，但它可能与资料 ID 处理路径冲突，前端不使用。
+- 非法或损坏文件、文件过大、旧版 `.ppt` 仍由 Stage 10 原有校验拒绝。
+- 不更改数据库结构；转换版 DOCX 被保存，原始 PPTX 不保留。

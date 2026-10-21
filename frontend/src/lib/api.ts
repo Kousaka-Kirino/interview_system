@@ -133,7 +133,7 @@ export const materialApi = {
   upload: (file: File) =>
     request<MaterialInfo>(
       // stage10:pptx-import -- DOCX derivative uses existing RAG pipeline
-      file.name.toLowerCase().endsWith('.pptx') ? '/api/materials/pptx-import' : '/api/materials', { method: 'POST', body: fileBody(file) }),
+      file.name.toLowerCase().endsWith('.pptx') ? '/api/pptx-import' : '/api/materials', { method: 'POST', body: fileBody(file) }),
   remove: (id: string) =>
     request<void>(`/api/materials/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   search: (body: MaterialSearchRequest) =>
