@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from uuid import UUID
+
 from fastapi import Request
 
 from app.core.config import get_settings, Settings, PROJECT_ROOT
@@ -40,11 +41,13 @@ def account_settings(user_id: str) -> Settings:
     if is_legacy_owner(user_id):
         return base
     user = user_root(user_id)
-    return base.model_copy(update={
-        "sqlite_path": str(user / "interview.db"),
-        "chroma_path": str(user / "chroma"),
-        "upload_path": str(user / "uploads"),
-    })
+    return base.model_copy(
+        update={
+            "sqlite_path": str(user / "interview.db"),
+            "chroma_path": str(user / "chroma"),
+            "upload_path": str(user / "uploads"),
+        }
+    )
 
 
 def get_user_settings(request: Request) -> Settings:

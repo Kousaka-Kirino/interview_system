@@ -41,7 +41,9 @@ export default function App() {
   const [route, setRoute] = useState<Route>(readRoute)
 
   useEffect(() => {
-    function update() { setRoute(readRoute()) }
+    function update() {
+      setRoute(readRoute())
+    }
     window.addEventListener('hashchange', update)
     return () => window.removeEventListener('hashchange', update)
   }, [])
@@ -55,8 +57,12 @@ export default function App() {
           </div>
           <div className="flex flex-wrap items-center gap-1">
             {navigation.map(({ tab, hash, label, icon: Icon }) => (
-              <a key={tab} href={hash} aria-current={route.tab === tab ? 'page' : undefined}
-                className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${route.tab === tab ? 'bg-cyan-400/15 font-semibold text-cyan-200' : 'text-slate-400 hover:bg-white/10 hover:text-white'}`}>
+              <a
+                key={tab}
+                href={hash}
+                aria-current={route.tab === tab ? 'page' : undefined}
+                className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition ${route.tab === tab ? 'bg-cyan-400/15 font-semibold text-cyan-200' : 'text-slate-400 hover:bg-white/10 hover:text-white'}`}
+              >
                 <Icon className="size-4" aria-hidden="true" /> {label}
               </a>
             ))}

@@ -1,0 +1,40 @@
+{
+  "version": "stage12-minimal-safe-v1",
+  "source": "interview_system-main.zip uploaded 2026-10-21",
+  "changes": {
+    "backend/app/main.py": {
+      "original_sha256": "c70000fa0d16d1025f59f117ef7a5737c96ec2fa57a2d40d8e4f09d4465d46be",
+      "new_sha256": "9916c507aa9397b3f36dbc18cf46200e61ab3958ddea64614209c79266c01b53",
+      "kind": "format-only"
+    },
+    "backend/app/stage11_local.py": {
+      "original_sha256": "e9a8758e3b724a203b0b9737c01d935ce83457f9be282093fa1de2a9d630ff93",
+      "new_sha256": "26ccfe1b4673a93e393e4cdb38ed0726623ca9e43205096427c922e2b286a11d",
+      "kind": "format-only"
+    },
+    "frontend/src/App.tsx": {
+      "original_sha256": "863f47a525bdfbe1f69a7d3c595821508551e86061076a8b8fe88cf0da085800",
+      "new_sha256": "33d1e46e8a033faafd26979be1f35ab37fa2d3e3d6efeb5f78745a4c91a95007",
+      "kind": "format-only"
+    },
+    "frontend/src/lib/api.ts": {
+      "original_sha256": "db8c079863287ec2e3371f9f0dea4f45021c86b9c3e43ac88523cd6f7ac0e551",
+      "new_sha256": "4036b137ada900129468538dd52ee8c2a15a1fd3838b9f523a6f34e02062490f",
+      "kind": "format-only"
+    },
+    ".gitignore": {
+      "original_sha256": "ea2aa5f70baee7b95934c27a02bb8eef88e742fc19ee6e0c784038f35cecbfc3",
+      "new_sha256": "e13fb35c398efaffbd4c3e4accd248f7ffb41f1f3831a9bbfa144d6395b57661",
+      "kind": "project-config"
+    },
+    ".editorconfig": {
+      "original_sha256": null,
+      "new_sha256": "244c84ac45fd6063242256e6af2e92e503ef3ce320c8472f06d076858ce4df92",
+      "kind": "project-config"
+    }
+  },
+  "archive": [
+    "backend/app/main.py.stage10_backup",
+    "frontend/package-lock.json.bak"
+  ]
+}

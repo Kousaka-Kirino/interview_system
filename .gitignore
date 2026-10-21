@@ -19,3 +19,12 @@ storage/uploads/
 .idea/
 Thumbs.db
 .DS_Store
+
+# Stage 12: keep ALL account workspaces and SQLite files private.
+storage/users/
+storage/**/*.db
+storage/**/*.sqlite
+storage/**/*.sqlite3
+# Historical local patch artifacts (archived by the Stage 12 installer).
+backend/app/*.stage*_backup
+frontend/package-lock.json.bak

@@ -1,0 +1,20 @@
+# Consistent editor defaults; does not alter runtime behavior.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{py,ts,tsx,js,jsx,json,md,yml,yaml}]
+indent_style = space
+
+[*.py]
+indent_size = 4
+
+[*.{ts,tsx,js,jsx,json}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
