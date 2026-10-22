@@ -19,9 +19,10 @@ def is_legacy_owner(user_id: str) -> bool:
         legacy = db.execute(
             "SELECT id FROM app_users WHERE username='aslan' COLLATE NOCASE LIMIT 1"
         ).fetchone()
-        if legacy is None:
-            raise RuntimeError("Initial local owner missing")
-        return str(legacy["id"]) == str(user_id)
+        # A clean installation has no legacy 'aslan' account. In that case,
+        # every registered user gets a distinct Stage 11 workspace.
+        # Never infer legacy ownership or assign original business data.
+        return legacy is not None and str(legacy["id"]) == str(user_id)
 
 
 def user_root(user_id: str) -> Path:

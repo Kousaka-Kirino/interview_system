@@ -12,10 +12,12 @@ from app.api.sessions import router as sessions_router
 from app.api.reports import router as reports_router
 from app.core.config import get_settings
 from app.core.database import init_db
+from app.stage13_bootstrap import initialize_account_database
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    initialize_account_database()
     init_db()
     yield
 

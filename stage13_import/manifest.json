@@ -1,0 +1,25 @@
+{
+  "title": "Stage 13 clean-machine SQLite bootstrap",
+  "files": {
+    "backend/app/main.py": {
+      "before": "9916c507aa9397b3f36dbc18cf46200e61ab3958ddea64614209c79266c01b53",
+      "after": "ec0cf6e1583003a94c3e72417388f448edd46bb18a1efe2565f1dcce568cf625"
+    },
+    "backend/app/stage11_local.py": {
+      "before": "26ccfe1b4673a93e393e4cdb38ed0726623ca9e43205096427c922e2b286a11d",
+      "after": "df4a3fb8eca5cdcbb5f02b0702c14d8893f49f416ae2ad54b1a374e3abd00ca8"
+    },
+    "backend/app/stage13_bootstrap.py": {
+      "before": null,
+      "after": "4ce9f9ad4f9655573aa11cfaef5e42b26d21f593f93740130731540f37a649bc"
+    },
+    "backend/tests/test_stage13_bootstrap.py": {
+      "before": null,
+      "after": "e7b9c84c3a098654558e0398901e003a6e72935452c9a97e507496a16d35d390"
+    },
+    "docs/STAGE13_FRESH_INSTALL.md": {
+      "before": null,
+      "after": "e24350cffa6ff6e2d694c14f6cd1cd5602f58755c0e78cf464ee1d0e671565f4"
+    }
+  }
+}
