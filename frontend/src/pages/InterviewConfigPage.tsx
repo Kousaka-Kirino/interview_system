@@ -30,8 +30,8 @@ const adaptation = [
 
 
 /**
- * Stage 9F — layout-only overrides for the original Stage 9E portal inputs.
- * Leave the recording, session timers, and localStorage handlers untouched.
+ * Layout rules for the timer settings rendered by the voice/timer component.
+ * Recording, countdown, and persistence are managed by that component.
  */
 const durationLayoutCSS = `
 [data-defense-config="true"] .stage9e-in-left.stage9c-config-slot {
@@ -199,7 +199,7 @@ export default function InterviewConfigPage() {
       })
     }
 
-    // Stage 9E inserts the timer card asynchronously through a React portal.
+    // The timer settings are mounted asynchronously through a portal.
     const domObserver = new MutationObserver(scheduleAlign)
     domObserver.observe(main, { childList: true, subtree: true })
     const sizeObserver = typeof ResizeObserver !== 'undefined'
@@ -255,7 +255,7 @@ export default function InterviewConfigPage() {
             <span className="rounded-2xl bg-cyan-500/10 p-3 text-cyan-300"><BookOpenCheck className="size-7" /></span>
             <div>
               <h1 className="text-2xl font-bold">创建模拟答辩</h1>
-              <p className="mt-1 text-sm text-slate-400">选择真实简历和资料，使用 Stage 3 已有接口生成第一道题。</p>
+              <p className="mt-1 text-sm text-slate-400">选择简历、补充材料及答辩设置，准备开始模拟练习。</p>
             </div>
           </div>
         </header>
@@ -291,7 +291,7 @@ export default function InterviewConfigPage() {
               <h2 className="flex items-center gap-2 font-semibold"><Layers className="size-5 text-cyan-300" /> 2. 补充资料（可选）</h2>
               <p className="my-3 text-sm text-slate-400">选中后会在答辩时进行 RAG 检索；最多 10 份。</p>
               {loading ? <p className="text-sm text-slate-400">加载中…</p>
-                : materials.length === 0 ? <p className="text-sm text-slate-400">暂无资料，可在 <a href="#materials" className="text-cyan-300 underline">补充资料</a> 上传。</p>
+                : materials.length === 0 ? <p className="text-sm text-slate-400">暂无资料，可在 <a href="#materials" className="text-cyan-300 underline">我的材料</a> 上传。</p>
                   : (
                     <div className="max-h-60 space-y-2 overflow-y-auto">
                       {materials.map((item) => {

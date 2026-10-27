@@ -9,7 +9,7 @@ const STORAGE_KEY = 'interview_system:last_session_id'
 const PROBE_PATHS = [
   { label: '健康检查', path: '/api/health' },
   { label: '简历列表', path: '/api/resumes' },
-  { label: '补充资料', path: '/api/materials' },
+  { label: '我的材料', path: '/api/materials' },
   { label: '历史统计', path: '/api/interviews/statistics' },
   { label: '历史列表', path: '/api/interviews/history?limit=1&offset=0' },
 ] as const
@@ -156,7 +156,7 @@ export default function SystemHealthPanel() {
 
   async function copyDiagnostics() {
     const lines = [
-      'AI 模拟答辩系统 — Stage 5E 接口自检',
+      'AI 模拟答辩系统 — 运行状态检查',
       `检查时间：${lastCheck}`,
       `后端状态：${connection}`,
       ...(probes ?? []).map(item => `${item.ok ? 'OK' : 'FAIL'} | ${item.label} | ${item.path} | ${item.status}`),

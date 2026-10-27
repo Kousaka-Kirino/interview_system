@@ -1,32 +1,29 @@
-# React + TypeScript + Vite
+# AI 答辩训练系统 · 前端
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+本目录使用 React、TypeScript 和 Vite，通过 `/api` 访问本机 FastAPI 后端。
 
-Currently, two official plugins are available:
+## 开发与验证
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+在项目根目录以 PowerShell 进入 `frontend`：
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```powershell
+npm.cmd ci
+npm.cmd run test:ui
+npm.cmd run build
+npm.cmd run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+开发页面默认位于 <http://127.0.0.1:5173/>，后端默认在 `127.0.0.1:8000`；需另行启动后端。
+
+## 页面入口
+
+- `#dashboard`：数据概览与历史记录
+- `#resumes`：简历管理
+- `#materials`：我的材料（PDF / DOCX / PPTX、检索工具）
+- `#configure`：创建模拟答辩
+- `#session/<会话ID>`：答题会话
+- `#report/<会话ID>`：答辩复盘
+
+检索工具位于“我的材料”下方，默认折叠。用户无需手动执行检索即可开始正常答辩。
+
+每次修改 UI 需要更新项目文档、补充相关测试，并执行 `npm.cmd run test:ui` 与 `npm.cmd run build`。本轮变更细节见 `../docs/UI_POLISH_PHASE1.md`。

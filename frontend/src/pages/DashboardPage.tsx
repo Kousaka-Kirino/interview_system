@@ -191,7 +191,7 @@ export default function DashboardPage() {
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-300">Interview Studio</p>
               <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">AI 模拟答辩工作台</h1>
-              <p className="mt-1 text-sm text-slate-400">历史记录、表现概览与复盘 · Stage 5D</p>
+              <p className="mt-1 text-sm text-slate-400">查看答辩记录、练习表现与复盘</p>
             </div>
           </div>
           <button
@@ -229,7 +229,7 @@ export default function DashboardPage() {
           <SummaryCard label="答辩总场次" value={stats?.total_sessions ?? (loading ? '…' : '—')} caption="历史创建的所有会话" icon={ClipboardList} />
           <SummaryCard label="已完成" value={stats?.completed_sessions ?? (loading ? '…' : '—')} caption="正常完成或提前结束" icon={CheckCircle2} />
           <SummaryCard label="已回答题目" value={stats?.answered_turns ?? (loading ? '…' : '—')} caption="已记录的主问题与追问回答" icon={Activity} />
-          <SummaryCard label="历史平均分" value={stats ? scoreText(stats.average_score) : loading ? '…' : '—'} caption="已评分回答均值，仅供练习参考" icon={BookOpenText} />
+          <SummaryCard label="历史平均分" value={stats ? scoreText(stats.average_score) : loading ? '…' : '—'} caption="仅供练习参考" icon={BookOpenText} />
         </section>
 
         <section aria-label="历史答辩列表" className="mt-10 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80 shadow-2xl shadow-slate-950/20">

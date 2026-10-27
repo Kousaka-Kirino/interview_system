@@ -294,10 +294,10 @@ function DashboardReview({ onOpen }: { onOpen: (point: KnowledgePoint) => void }
   const [showAdd, setShowAdd] = useState(false)
   return <section aria-label="答辩雷达图与风险复习看板" className="stage7c-dark my-6 space-y-4 rounded-2xl border border-slate-700 bg-slate-950/40 p-4 text-slate-100 sm:p-6">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><p className="text-xs font-semibold tracking-widest text-cyan-300">STAGE 7 · 知识风险复习</p><h2 className="mt-1 text-xl font-bold">答辩能力与风险看板</h2><p className="mt-1 text-sm text-slate-400">一屏掌握重点知识、薄弱点与复习进展</p></div>
+      <div><p className="text-xs font-semibold tracking-widest text-cyan-300">知识重点与复习</p><h2 className="mt-1 text-xl font-bold">答辩能力与风险看板</h2><p className="mt-1 text-sm text-slate-400">一屏掌握重点知识、薄弱点与复习进展</p></div>
       <div className="flex gap-2"><button className={secondary} onClick={() => void reload()}><RefreshCw size={14} className="mr-1 inline" />刷新</button><button className={primary} onClick={() => setShowAdd(v => !v)}><BookOpen size={15} className="mr-1 inline" />{showAdd ? '收起录入' : '添加复习知识'}</button></div>
     </div>
-    {error && <p role="alert" className="rounded-lg bg-rose-950/60 p-3 text-sm text-rose-300">加载失败：{error}。请检查 FastAPI 是否已重启并加载 Stage 7。</p>}
+    {error && <p role="alert" className="rounded-lg bg-rose-950/60 p-3 text-sm text-rose-300">加载失败：{error}。请检查后端服务是否正常运行。</p>}
     {loading && <p role="status" className="text-sm text-slate-400">正在读取本地复习记录…</p>}
     {overview && <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {[["知识点总数", overview.total], ["重点知识", overview.important], ["待复习", overview.pending], ["已巩固", overview.mastered]].map(([label, value]) => <div key={label} className="rounded-xl border border-slate-700 bg-slate-900 p-4"><p className="text-xs text-slate-400">{label}</p><p className="mt-2 text-2xl font-bold text-cyan-300">{value}</p></div>)}

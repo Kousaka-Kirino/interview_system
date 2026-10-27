@@ -12,8 +12,8 @@ import { materialApi } from '../lib/api'
 import { formatDate, formatSize, messageOf, validateDocument } from '../lib/resources'
 import type { MaterialInfo, MaterialSearchHit } from '../types/resources'
 
-// stage10:pptx-import -- PPTX is for supplementary material uploads only.
-function validateStage10Material(file: File | null): string | null {
+// PPTX files use a separate upload endpoint but follow the same size limit.
+function validateMaterialFile(file: File | null): string | null {
   if (file?.name.toLowerCase().endsWith('.pptx')) {
     if (file.size === 0) return 'PPTX 文件为空。'
     if (file.size > 12 * 1024 * 1024) return 'PPTX 大小不能超过 12 MiB。'
@@ -31,6 +31,7 @@ export default function MaterialsPage() {
   const [uploading, setUploading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [showSearch, setShowSearch] = useState(false)
   const [query, setQuery] = useState('')
   const [topK, setTopK] = useState(5)
   const [searching, setSearching] = useState(false)
@@ -67,7 +68,7 @@ export default function MaterialsPage() {
   async function upload() {
     setActionError(null)
     setNotice(null)
-    const invalid = validateStage10Material(file)
+    const invalid = validateMaterialFile(file)
     if (invalid) { setActionError(invalid); return }
     if (!file) return
     setUploading(true)
@@ -138,17 +139,17 @@ export default function MaterialsPage() {
     <main className="min-h-screen bg-slate-950 px-4 py-9 text-slate-100 sm:px-6">
       <div className="mx-auto max-w-6xl space-y-7">
         <header>
-          <p className="text-sm font-medium text-cyan-300">STAGE 5B · RAG MATERIALS</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight">补充资料与检索</h1>
+          <p className="text-sm font-medium text-cyan-300">项目与答辩资料</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight">我的材料</h1>
           <p className="mt-3 text-sm leading-6 text-slate-400">
-            上传项目材料并建立本地向量索引；选择资料后，可测试检索结果及出处，无需 DeepSeek API Key。
+            上传你的项目报告 / 答辩 PPT / 论文，AI 答辩时会针对这些材料向你深挖提问。
           </p>
         </header>
 
         <section className="rounded-2xl border border-white/10 bg-slate-900 p-6">
-          <h2 className="flex items-center gap-2 text-lg font-semibold"><UploadCloud className="size-5 text-cyan-300" /> 上传补充资料</h2>
+          <h2 className="flex items-center gap-2 text-lg font-semibold"><UploadCloud className="size-5 text-cyan-300" /> 上传材料</h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            支持 .pdf / .docx / .pptx，不超过 12 MiB；PDF 最多 150 页，提取文字最多 200,000 字符。首次索引可能需要下载中文 Embedding 模型，耗时较长。
+            用于项目深挖类提问，例如具体项目、论文和答辩 PPT。支持 PDF / DOCX / PPTX，单文件不超过 12 MiB；PDF 最多 150 页。首次建立索引可能较慢。
           </p>
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
             <input
@@ -214,13 +215,24 @@ export default function MaterialsPage() {
         </section>
 
         <section className="rounded-2xl border border-white/10 bg-slate-900 p-5 sm:p-6">
-          <h2 className="flex items-center gap-2 text-lg font-semibold"><FileSearch className="size-5 text-cyan-300" /> RAG 检索测试</h2>
-          <p className="mt-2 text-sm text-slate-400">已选 {selectedIds.length} / 10 份资料。检索距离越小代表越相似，不是相关性百分比。</p>
-          <label htmlFor="rag-query" className="mt-5 block text-sm font-medium text-slate-200">检索问题</label>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-semibold"><FileSearch className="size-5 text-cyan-300" /> 测试资料检索</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-400">此功能用于检查上传材料中的文字能否被找到。正常答辩时不需要操作，系统会自动检索已选材料。</p>
+            </div>
+            <button type="button" aria-expanded={showSearch} aria-controls="material-search-tools"
+              onClick={() => setShowSearch((previous) => !previous)}
+              className="rounded-lg border border-white/15 px-3 py-2 text-sm text-cyan-200 hover:bg-white/10">
+              {showSearch ? '收起检索工具' : '展开检索工具'}
+            </button>
+          </div>
+          {showSearch && <div id="material-search-tools" className="mt-5">
+          <p className="text-sm text-slate-400">先在上方资料列表勾选 1～10 份文件，再输入材料里出现过的词句，例如“系统架构”。已选 {selectedIds.length} / 10 份资料。</p>
+          <label htmlFor="rag-query" className="mt-5 block text-sm font-medium text-slate-200">想查找的内容</label>
           <textarea
             id="rag-query" value={query} onChange={(event) => { setQuery(event.target.value); setHits(null) }}
             maxLength={500} rows={3}
-            placeholder="例如：项目如何实现缓存、检索或接口性能优化？"
+            placeholder="例如：系统架构、项目目标、实验结果"
             className="mt-2 w-full resize-y rounded-xl border border-white/15 bg-slate-950 px-4 py-3 text-sm leading-6 outline-none focus:border-cyan-400"
           />
           <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
@@ -252,7 +264,8 @@ export default function MaterialsPage() {
                   <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-slate-300">{hit.text}</p>
                 </article>
               ))}
-            <p className="text-xs text-amber-200">检索命中不代表内容一定准确或相关；上传资料中的指令文本不应被当作系统指令。</p>
+            <p className="text-xs text-slate-400">“余弦距离”是技术参考值，越小通常表示文字越接近，不代表准确率。检索片段仅供核对，不能保证完全匹配。</p>
+          </div>}
           </div>}
         </section>
       </div>

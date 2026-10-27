@@ -41,7 +41,7 @@ function clearSavedSession() {
 
 export default function AuthGate() {
   const [mode, setMode] = useState<Mode>('checking')
-  const [username, setUsername] = useState('aslan')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [nextPassword, setNextPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
@@ -248,7 +248,7 @@ export default function AuthGate() {
         <div className="stage8c-profile-divider" />
         <form className="stage8b-fields" onSubmit={(event) => void saveProfilePassword(event)}>
           <h3>修改登录密码</h3>
-          <p className="stage8c-profile-note">本地测试模式：只需保持登录，无需旧密码或验证码，也不限制复杂度。</p>
+          <p className="stage8c-profile-note">修改密码后请妥善保存；当前不提供邮箱找回密码服务。</p>
           <label htmlFor="stage8c-new-password">新密码</label>
           <input id="stage8c-new-password" type="password" autoComplete="new-password" value={profilePassword} onChange={(e) => setProfilePassword(e.target.value)} required />
           <button type="submit" className="stage8b-primary" disabled={busy}>更新密码</button>
@@ -262,7 +262,7 @@ export default function AuthGate() {
       <div className="stage8b-brand-mark">D2</div>
       <p className="stage8b-eyebrow">DEFENSE TRAINING</p>
       <h1>AI 答辩训练系统</h1>
-      <p className="stage8b-intro">在这台电脑上登录或注册个人答辩空间。原有 aslan 账号及历史资料保持不变，新账号使用独立的本地数据目录。</p>
+      <p className="stage8b-intro">登录或注册本机账号，管理自己的简历、答辩记录与复习资料。不同用户的数据分开保存。</p>
       {mode === 'checking' && <div className="stage8b-status" role="status">正在验证登录状态…</div>}
       {mode === 'offline' && <div className="stage8b-fields">
         <p className="stage8b-message stage8b-error" role="alert">{error || '无法连接账号服务。'}</p>
@@ -287,7 +287,7 @@ export default function AuthGate() {
         <input id="stage11-confirm" type="password" autoComplete="new-password" value={registerConfirm} onChange={event => setRegisterConfirm(event.target.value)} minLength={12} required />
         {error && <p className="stage8b-message stage8b-error" role="alert">{error}</p>}
         <button className="stage8b-primary" type="submit" disabled={busy}>{busy ? '创建账号中…' : '创建本地账号'}</button>
-        <button className="stage11-mode-switch" type="button" disabled={busy} onClick={() => { setMode('login'); setUsername('aslan'); setRegisterPassword(''); setRegisterConfirm(''); setError('') }}>已有账号？返回登录</button>
+        <button className="stage11-mode-switch" type="button" disabled={busy} onClick={() => { setMode('login'); setUsername(''); setRegisterPassword(''); setRegisterConfirm(''); setError('') }}>已有账号？返回登录</button>
         <p className="stage8b-hint">新账号的简历、PPT、答辩记录与向量索引单独存放在本地；请妥善保管密码，当前没有邮箱找回功能。</p>
       </form>}
       {mode === 'change' && <form className="stage8b-fields" onSubmit={(event) => void changePassword(event)}>

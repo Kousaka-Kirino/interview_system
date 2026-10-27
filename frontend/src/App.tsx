@@ -33,7 +33,7 @@ function readRoute(): Route {
 const navigation = [
   { tab: 'dashboard', hash: '#dashboard', label: '数据概览', icon: LayoutDashboard },
   { tab: 'resumes', hash: '#resumes', label: '简历管理', icon: FileText },
-  { tab: 'materials', hash: '#materials', label: '补充资料', icon: Files },
+  { tab: 'materials', hash: '#materials', label: '我的材料', icon: Files },
   { tab: 'configure', hash: '#configure', label: '开始答辩', icon: Play },
 ] as const
 

@@ -187,7 +187,7 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
                         <p className="mb-2 text-xs font-semibold text-cyan-300">你的回答</p>
                         <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300">{turn.answer}</p>
                         <p className="mt-3 text-sm font-semibold text-slate-100">评分：{scoreLabel(turn.score)}</p>
-                        {turn.feedback && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-400">建议：{turn.feedback}</p>}
+                        {turn.feedback && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-400">AI 给出的建议：{turn.feedback}</p>}
                       </div>
                     )}
                     {turn.id === currentQuestion?.id && <p className="mt-3 text-xs text-cyan-300">请在下方输入这道题的回答</p>}

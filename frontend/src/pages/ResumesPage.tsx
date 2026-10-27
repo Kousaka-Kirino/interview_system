@@ -114,10 +114,10 @@ export default function ResumesPage() {
     <main className="min-h-screen bg-slate-950 px-4 py-9 text-slate-100 sm:px-6">
       <div className="mx-auto max-w-6xl space-y-7">
         <div>
-          <p className="text-sm font-medium text-cyan-300">STAGE 5B · RESUMES</p>
+          <p className="text-sm font-medium text-cyan-300">个人资料 · 简历</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight">简历管理</h1>
           <p className="mt-3 text-sm leading-6 text-slate-400">
-            上传可提取文本的 PDF 或 DOCX，解析结果保存在本机。上载和查看无需 DeepSeek API Key。
+            用于基本信息类提问，例如你的专业、实习经历与个人技能。上传 PDF 或 DOCX 后，系统会在本机提取文字。
           </p>
         </div>
 
