@@ -13,13 +13,15 @@ import {
   CheckCircle2,
 } from 'lucide-react'
 import { materialApi, resumeApi } from '../lib/api'
-import { createInterview } from '../lib/interviews'
+import { createInterview, getInterview } from '../lib/interviews'
 import { messageOf } from '../lib/resources'
 import type { MaterialInfo, ResumeInfo } from '../types/resources'
 import type { BackendInterviewConfig, InterviewerStyle } from '../types/interview'
 import { parseMinutes } from '../components/speech/defenseTime'
 import { DEFAULT_PREFERENCES, PRACTICE_PRESETS, assessTime, bindSessionTiming, loadPreferences, savePreferences } from '../lib/defenseConfiguration'
 import type { DefenseTiming } from '../lib/defenseConfiguration'
+import { repeatDraft, repeatTiming } from '../lib/retryPractice'
+import type { RepeatDraft } from '../lib/retryPractice'
 
 const reviewerStyles: Array<{ value: InterviewerStyle; title: string; description: string }> = [
   { value: 'friendly', title: '和善型', description: '温和引导，但不会放松评价标准' },
@@ -35,7 +37,7 @@ const adaptation = [
 ]
 
 
-export default function InterviewConfigPage() {
+export default function InterviewConfigPage({ retrySessionId }: { retrySessionId?: string }) {
   const [resumes, setResumes] = useState<ResumeInfo[]>([])
   const [materials, setMaterials] = useState<MaterialInfo[]>([])
   const [resumeId, setResumeId] = useState('')
@@ -49,19 +51,36 @@ export default function InterviewConfigPage() {
   const [loadError, setLoadError] = useState('')
   const [createError, setCreateError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [repeatSource, setRepeatSource] = useState<RepeatDraft | null>(null)
+  const [repeatAppliedAccount, setRepeatAppliedAccount] = useState<string | null>(null)
+  const [repeatTimingNotice, setRepeatTimingNotice] = useState('')
 
   useEffect(() => {
     const controller = new AbortController()
     let live = true
     setLoading(true)
     setLoadError('')
-    Promise.all([resumeApi.list(controller.signal), materialApi.list(controller.signal)])
-      .then(([nextResumes, nextMaterials]) => {
+    setRepeatSource(null)
+    setRepeatAppliedAccount(null)
+    Promise.all([
+      resumeApi.list(controller.signal),
+      materialApi.list(controller.signal),
+      retrySessionId ? getInterview(retrySessionId, controller.signal) : Promise.resolve(null),
+    ])
+      .then(([nextResumes, nextMaterials, previous]) => {
         if (!live) return
+        if (retrySessionId) {
+          if (!previous) throw new Error('无法读取原答辩会话。')
+          const draft = repeatDraft(previous, nextResumes, nextMaterials)
+          setResumeId(draft.resumeId)
+          setMaterialIds(draft.materialIds)
+          setRepeatSource(draft)
+        } else {
+          setResumeId((prev) => nextResumes.some((r) => r.id === prev) ? prev : (nextResumes[0]?.id ?? ''))
+          setMaterialIds((prev) => prev.filter((id) => nextMaterials.some((m) => m.id === id)))
+        }
         setResumes(nextResumes)
         setMaterials(nextMaterials)
-        setResumeId((prev) => nextResumes.some((r) => r.id === prev) ? prev : (nextResumes[0]?.id ?? ''))
-        setMaterialIds((prev) => prev.filter((id) => nextMaterials.some((m) => m.id === id)))
       })
       .catch((error: unknown) => {
         if (live && !(error instanceof Error && error.name === 'AbortError')) {
@@ -70,7 +89,7 @@ export default function InterviewConfigPage() {
       })
       .finally(() => { if (live) setLoading(false) })
     return () => { live = false; controller.abort() }
-  }, [fetchCounter])
+  }, [fetchCounter, retrySessionId])
 
   // Confirm the account with the server and re-load whenever auth state changes.
   // This prevents stale preferences being shown if A signs out and B signs in on the same screen.
@@ -80,6 +99,11 @@ export default function InterviewConfigPage() {
     const resetAccount = () => {
       controller?.abort()
       setAccountId(null)
+      setRepeatSource(null)
+      setRepeatAppliedAccount(null)
+      setRepeatTimingNotice('')
+      setResumeId('')
+      setMaterialIds([])
       setConfig({ ...DEFAULT_PREFERENCES.config })
       setTiming({ ...DEFAULT_PREFERENCES.timing })
       setAccountError('')
@@ -109,8 +133,10 @@ export default function InterviewConfigPage() {
     }
     const authChanged = (event: Event) => {
       const ready = (event as CustomEvent<{ ready: boolean }>).detail?.ready
-      if (ready) loadAccount()
-      else resetAccount()
+      if (ready) {
+        loadAccount()
+        setFetchCounter((value) => value + 1)
+      } else resetAccount()
     }
     window.addEventListener('interview-auth-change', authChanged)
     loadAccount()
@@ -121,11 +147,28 @@ export default function InterviewConfigPage() {
     }
   }, [])
 
+  // Apply a repeat draft only after the current account has been verified.
+  // Source answers/scores/deadlines are never copied; users must confirm creation.
   useEffect(() => {
-    if (!accountId) return
+    if (!retrySessionId || !accountId || !repeatSource) return
+    setConfig({ ...repeatSource.config })
+    let previousTime: DefenseTiming | null = null
+    try { previousTime = repeatTiming(retrySessionId, window.localStorage) }
+    catch { /* Some browsers block access to the storage property itself. */ }
+    if (previousTime) {
+      setTiming(previousTime)
+      setRepeatTimingNotice('已读取这场答辩在本浏览器中保存的时间设置。')
+    } else {
+      setRepeatTimingNotice('原场次时间设置未保存在当前浏览器，将使用当前账号的上次时间偏好；请重新核对。')
+    }
+    setRepeatAppliedAccount(accountId)
+  }, [retrySessionId, accountId, repeatSource])
+
+  useEffect(() => {
+    if (!accountId || (retrySessionId && repeatAppliedAccount !== accountId)) return
     try { savePreferences(accountId, { config, timing }, window.localStorage) }
     catch { /* Browser denied storage access. */ }
-  }, [accountId, config, timing])
+  }, [accountId, config, timing, retrySessionId, repeatAppliedAccount])
 
   const timeAssessment = assessTime(config.question_count, timing.questionMinutes, timing.totalMinutes, config.max_followups)
   const invalidTime = timeAssessment.kind === 'invalid'
@@ -142,7 +185,8 @@ export default function InterviewConfigPage() {
   }
 
   async function startInterview() {
-    if (!resumeId || loading || submitting || loadError || !accountId || invalidTime) return
+    if (!resumeId || loading || submitting || loadError || !accountId || invalidTime ||
+        (retrySessionId && (!repeatSource || repeatAppliedAccount !== accountId))) return
     setSubmitting(true)
     setCreateError('')
     try {
@@ -187,13 +231,30 @@ export default function InterviewConfigPage() {
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
             {PRACTICE_PRESETS.map((preset) => (
               <button key={preset.id} type="button" onClick={() => applyPreset(preset)}
-                className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-3 text-left hover:border-cyan-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400">
+                disabled={!!retrySessionId && (loading || !accountId || !repeatSource || repeatAppliedAccount !== accountId)}
+                className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-3 text-left hover:border-cyan-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400 disabled:cursor-not-allowed disabled:opacity-40">
                 <span className="block text-sm font-medium text-white">{preset.label}</span>
                 <span className="mt-1 block text-xs text-slate-400">{preset.description}</span>
               </button>
             ))}
           </div>
         </section>
+
+        {retrySessionId && (
+          <section aria-label="沿用上次答辩配置" className="mb-6 rounded-2xl border border-cyan-400/30 bg-cyan-400/5 p-5">
+            <h2 className="font-semibold text-cyan-200">沿用上一场资料，再练一次</h2>
+            <p className="mt-2 text-sm text-slate-300">只恢复原场次仍存在的简历、资料和评委/题量配置，不复制回答、评分或复盘；这一步不会调用 AI。</p>
+            {loading && <p role="status" className="mt-2 text-sm text-slate-400">正在检查原场次和资料…</p>}
+            {!loading && repeatSource && repeatAppliedAccount === accountId && (
+              <div className="mt-2 text-sm text-slate-200">
+                <p>已选择原简历和 {repeatSource.materialIds.length} 份仍可用的材料，请核对后再开始新答辩。</p>
+                {repeatSource.missingMaterialCount > 0 && <p className="mt-1 text-amber-200">原场次有 {repeatSource.missingMaterialCount} 份资料已不可用，未自动替换，请手动检查。</p>}
+                <p className="mt-1 text-slate-400">{repeatTimingNotice}</p>
+              </div>
+            )}
+            <a href="#configure" className="mt-3 inline-block text-sm text-cyan-300 underline">取消沿用，改为普通配置</a>
+          </section>
+        )}
 
         {loadError && (
           <div role="alert" className="mb-6 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-100">
@@ -351,7 +412,7 @@ export default function InterviewConfigPage() {
               <RefreshCw className="size-4" /> 刷新简历与资料
             </button>
             <button type="button" onClick={startInterview}
-              disabled={loading || submitting || !!loadError || !accountId || invalidTime || !resumeId || !Number.isInteger(config.question_count) || config.question_count < 3 || config.question_count > 30}
+              disabled={loading || submitting || !!loadError || !accountId || invalidTime || !resumeId || (retrySessionId ? !repeatSource || repeatAppliedAccount !== accountId : false) || !Number.isInteger(config.question_count) || config.question_count < 3 || config.question_count > 30}
               className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40">
               {submitting ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
               {submitting ? '正在生成第一题…' : '开始答辩'}

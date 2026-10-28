@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
   BarChart3,
@@ -7,11 +7,13 @@ import {
   Download,
   LoaderCircle,
   RefreshCw,
+  RotateCcw,
   Sparkles,
   TriangleAlert,
 } from 'lucide-react'
 import { generateAIInterviewReport, getInterviewReport } from '../lib/interviews'
 import { messageOf } from '../lib/resources'
+import { exampleAnswers, reviewMarkdown, weakPoints } from '../lib/aiReview'
 import type { InterviewReport, ReportTurn } from '../types/interview'
 
 function displayScore(value: number | null): string {
@@ -80,6 +82,18 @@ function downloadLocalReport(report: InterviewReport): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
+function downloadMarkdown(report: InterviewReport): void {
+  const blob = new Blob(['\uFEFF', reviewMarkdown(report)], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `interview-review-${report.session_id}.md`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 function TextGroup({ title, items, tone }: { title: string; items: string[]; tone: string }) {
   return (
     <section className="rounded-2xl border border-white/10 bg-slate-900/80 p-5">
@@ -121,6 +135,9 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
   const [aiBusy, setAiBusy] = useState(false)
   const [aiError, setAiError] = useState('')
   const [aiNotice, setAiNotice] = useState('')
+  const [autoAccountKey, setAutoAccountKey] = useState('')
+  const [autoEnabled, setAutoEnabled] = useState(false)
+  const autoAttempted = useRef(new Set<string>())
 
   useEffect(() => {
     const controller = new AbortController()
@@ -140,6 +157,47 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
       .finally(() => { if (live) setLoading(false) })
     return () => { live = false; controller.abort() }
   }, [sessionId, refreshCounter])
+
+  useEffect(() => {
+    let live = true
+    setAutoAccountKey('')
+    setAutoEnabled(false)
+    fetch('/api/auth/me', { cache: 'no-store', credentials: 'same-origin' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('无法确认当前账号')
+        return await response.json() as { username?: string }
+      })
+      .then((account) => {
+        if (!live || !account.username) return
+        const key = `interview_system:auto_ai_review:${account.username}`
+        setAutoAccountKey(key)
+        try { setAutoEnabled(window.localStorage.getItem(key) === '1') } catch { setAutoEnabled(false) }
+      }).catch(() => { if (live) setAutoAccountKey('') })
+    return () => { live = false }
+  }, [sessionId])
+
+  useEffect(() => {
+    if (!autoEnabled || !autoAccountKey || !report || report.session_id !== sessionId ||
+        report.ai_analysis || report.answered_count === 0 || loading || aiBusy ||
+        autoAttempted.current.has(sessionId)) return
+    autoAttempted.current.add(sessionId)
+    setAiBusy(true)
+    setAiError('')
+    generateAIInterviewReport(sessionId, false)
+      .then((updated) => { setReport(updated); setAiNotice('已自动生成 AI 复盘，并将薄弱点归入复习知识库。') })
+      .catch((reason: unknown) => setAiError(`自动生成失败：${messageOf(reason)}。可手动重试。`))
+      .finally(() => setAiBusy(false))
+  }, [autoEnabled, autoAccountKey, report, sessionId, loading, aiBusy])
+
+  function changeAutoEnabled(checked: boolean) {
+    if (!autoAccountKey) return
+    try {
+      window.localStorage.setItem(autoAccountKey, checked ? '1' : '0')
+      setAutoEnabled(checked)
+    } catch {
+      setAiError('浏览器不允许保存自动生成偏好；请允许本地存储或手动生成 AI 复盘。')
+    }
+  }
 
   async function requestAi(refresh: boolean) {
     if (!report || aiBusy || !report.answered_count) return
@@ -165,6 +223,8 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
   const aiStrengths = ai ? stringItems(ai.strengths) : []
   const aiImprovements = ai ? stringItems(ai.improvements) : []
   const aiNextSteps = ai ? stringItems(ai.next_steps) : []
+  const samples = report ? exampleAnswers(report) : []
+  const weaknesses = report ? weakPoints(report) : []
   const recognizedAi = !!ai && (!!aiSummary(ai) || !!aiStrengths.length || !!aiImprovements.length || !!aiNextSteps.length)
 
   return (
@@ -219,10 +279,14 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
 
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
               <span className="inline-flex items-center gap-2 text-sm text-emerald-300"><CheckCircle2 className="size-4" /> 答辩已完成 · {report.reviewer_style}</span>
-              <button type="button" onClick={() => downloadLocalReport(report)}
-                className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-100 hover:bg-white/10">
-                <Download aria-hidden="true" className="size-4" /> 导出本地 TXT
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => downloadLocalReport(report)} className="inline-flex items-center gap-2 rounded-xl border border-white/15 px-4 py-2 text-sm text-slate-100 hover:bg-white/10">
+                  <Download aria-hidden="true" className="size-4" /> 导出 TXT
+                </button>
+                <button type="button" onClick={() => downloadMarkdown(report)} className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/30 px-4 py-2 text-sm text-cyan-200 hover:bg-cyan-400/10">
+                  <Download aria-hidden="true" className="size-4" /> 导出完整 Markdown（含 AI 示范答案）
+                </button>
+              </div>
             </div>
 
             <section className="mt-7 rounded-2xl border border-white/10 bg-slate-900/80 p-5 sm:p-6">
@@ -245,11 +309,21 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
               <p className="mt-5 text-xs leading-5 text-slate-500">{report.scoring_note}</p>
             </section>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {!recognizedAi && <div className="mt-6 grid gap-4 md:grid-cols-3">
               <TextGroup title="优势" items={report.strengths} tone="text-emerald-300" />
               <TextGroup title="需要加强" items={report.improvements} tone="text-amber-300" />
               <TextGroup title="下一步建议" items={report.suggestions} tone="text-cyan-300" />
-            </div>
+            </div>}
+
+            <section aria-label="再练一次" className="mt-7 rounded-2xl border border-cyan-400/25 bg-cyan-400/5 p-5 sm:p-6">
+              <h2 className="text-lg font-semibold text-white">继续练习，巩固答辩表达</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-300">沿用本场仍然存在的简历、补充资料与答辩参数，先进入配置页核对，再决定是否开始新的一场。</p>
+              <p className="mt-1 text-xs text-slate-400">复用入口不会直接调用模型；若已启用下方 AI 自动复盘，将在打开完成的复盘页面后生成并保存薄弱点。</p>
+              <a href={`#configure/retry/${encodeURIComponent(sessionId)}`}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-cyan-300">
+                <RotateCcw aria-hidden="true" className="size-4" /> 沿用本场资料再练一次
+              </a>
+            </section>
 
             <section className="mt-7 rounded-2xl border border-white/10 bg-slate-900/80 p-5 sm:p-6">
               <h2 className="text-lg font-semibold">逐题回答与反馈</h2>
@@ -265,7 +339,7 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
                 <div>
                   <h2 className="flex items-center gap-2 text-lg font-semibold"><Sparkles className="size-5 text-cyan-300" />可选 AI 深度复盘</h2>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                    自动加载已有缓存不会调用模型。手动生成/刷新时会向 DeepSeek 发送答辩问答、评分等信息，可能产生费用；无需时不点击即可。
+                    AI 复盘可生成逐题示范答案并自动将有依据的薄弱点去重保存至本地复习库。调用云端模型时会上传答辩问答和评分；开启自动生成后，每场新复盘首次打开将自动调用一次。
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -277,10 +351,18 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
                   ) : (
                     <button type="button" onClick={() => requestAi(true)} disabled={aiBusy}
                       className="inline-flex items-center gap-2 rounded-xl border border-amber-400/30 px-4 py-2 text-sm text-amber-200 hover:bg-amber-400/10 disabled:opacity-40">
-                      {aiBusy && <LoaderCircle className="size-4 animate-spin" />} 重新生成（可能收费）
+                      {aiBusy && <LoaderCircle className="size-4 animate-spin" />} 重新生成 AI 复盘（再次计费）
                     </button>
                   )}
                 </div>
+              </div>
+              <div className="mt-4 space-y-2 rounded-xl border border-white/10 bg-slate-950/60 p-3">
+                <label className="flex items-start gap-2 text-sm text-slate-200">
+                  <input type="checkbox" checked={autoEnabled} disabled={!autoAccountKey} onChange={(event) => changeAutoEnabled(event.target.checked)} className="mt-1" />
+                  <span>此账号自动生成 AI 复盘与薄弱知识点（需先开启；每场首次打开复盘时可能产生费用）</span>
+                </label>
+                <p className="text-xs leading-5 text-slate-400">已缓存的复盘直接读取，不再扣费；重新生成会再次请求。DeepSeek 按实际输入/输出 Token、缓存命中及峰谷时段计费。例如 Flash 在输入 3000、输出 2000 Token 且输入缓存未命中时，按当前官方峰谷价估算约 ¥0.011～¥0.022；并非每次固定费用，具体以官方账单为准。本地 Ollama 不产生 DeepSeek API 调用费。</p>
+                <a href="https://api-docs.deepseek.com/zh-cn/quick_start/pricing" target="_blank" rel="noreferrer" className="text-xs text-cyan-300 underline">查看 DeepSeek 官方实时计费标准</a>
               </div>
               {!ai && <p className="mt-4 text-sm text-slate-400">尚未生成 AI 复盘。离线规则复盘已经可以正常使用。</p>}
               {report.answered_count === 0 && <p className="mt-3 text-xs text-amber-200">没有已回答题目，后端不允许生成 AI 复盘。</p>}
@@ -295,6 +377,24 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
                       {aiStrengths.length > 0 && <TextGroup title="AI 指出的优势" items={aiStrengths} tone="text-emerald-300" />}
                       {aiImprovements.length > 0 && <TextGroup title="AI 指出的改进方向" items={aiImprovements} tone="text-amber-300" />}
                       {aiNextSteps.length > 0 && <TextGroup title="AI 建议的下一步" items={aiNextSteps} tone="text-cyan-300" />}
+                      {samples.length > 0 && <div className="space-y-3">
+                        <h3 className="font-semibold text-white">逐题示范回答（示例，不代表真实经历）</h3>
+                        {samples.map((item) => {
+                          const turn = report.turns.find((entry) => entry.turn_id === item.turn_id)
+                          return <article key={item.turn_id} className="rounded-xl border border-white/10 bg-slate-950/70 p-4">
+                            <h4 className="text-sm font-semibold text-cyan-200">第 {turn?.question_number ?? '—'} 题参考回答</h4>
+                            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-200">{item.answer}</p>
+                            <p className="mt-2 text-xs leading-5 text-slate-400">推荐思路：{item.explanation}</p>
+                          </article>
+                        })}
+                      </div>}
+                      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                        <h3 className="font-semibold text-amber-200">自动识别的薄弱点 · 已归入本地复习库</h3>
+                        {weaknesses.length ? <ul className="mt-2 space-y-2 text-sm text-slate-300">
+                          {weaknesses.map((item) => <li key={`${item.turn_id}-${item.title}`}>• {item.title}（{item.dimension}）：{item.reason}</li>)}
+                        </ul> : <p className="mt-2 text-sm text-slate-400">没有找到证据充分的薄弱点，未自动创建条目。</p>}
+                        <p className="mt-2 text-xs text-slate-500">系统根据原题目锚点去重，可在答辩知识重点中继续管理。AI 内容请自行核实。</p>
+                      </div>
                     </>
                   ) : (
                     <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-xl bg-slate-950 p-4 text-xs leading-6 text-slate-300">{JSON.stringify(ai, null, 2)}</pre>

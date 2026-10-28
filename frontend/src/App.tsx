@@ -15,7 +15,7 @@ import InterviewReportPage from './pages/InterviewReportPage'
 
 type Tab = 'dashboard' | 'resumes' | 'materials' | 'configure' | 'session' | 'report'
 
-type Route = { tab: Tab; sessionId?: string; resumeId?: string }
+type Route = { tab: Tab; sessionId?: string; resumeId?: string; retrySessionId?: string }
 
 function readRoute(): Route {
   const hash = decodeURIComponent(window.location.hash.replace(/^#/, ''))
@@ -24,6 +24,9 @@ function readRoute(): Route {
     return { tab: 'resumes', resumeId: hash.slice('resumes/'.length) }
   }
   if (hash === 'configure' || hash === 'interview') return { tab: 'configure' }
+  if (hash.startsWith('configure/retry/') && hash.slice('configure/retry/'.length)) {
+    return { tab: 'configure', retrySessionId: hash.slice('configure/retry/'.length) }
+  }
   if (hash.startsWith('session/') && hash.slice('session/'.length)) {
     return { tab: 'session', sessionId: hash.slice('session/'.length) }
   }
@@ -75,7 +78,7 @@ export default function App() {
       {route.tab === 'dashboard' && <DashboardPage />}
       {route.tab === 'resumes' && <ResumesPage key={route.resumeId ?? 'list'} initialResumeId={route.resumeId} />}
       {route.tab === 'materials' && <MaterialsPage />}
-      {route.tab === 'configure' && <InterviewConfigPage />}
+      {route.tab === 'configure' && <InterviewConfigPage key={route.retrySessionId ?? 'normal'} retrySessionId={route.retrySessionId} />}
       {route.tab === 'session' && route.sessionId && <InterviewSessionPage key={route.sessionId} sessionId={route.sessionId} />}
       {route.tab === 'report' && route.sessionId && <InterviewReportPage key={route.sessionId} sessionId={route.sessionId} />}
     </div>
