@@ -34,6 +34,8 @@ from app.schemas.material import (
     MaterialSearchResponse,
 )
 
+from app.services.document_preview import preview_document
+
 from app.services.material_parser import (
     extract_material_text,
     split_text,
@@ -338,6 +340,18 @@ async def search_materials(
     return MaterialSearchResponse(
         hits=hits
     )
+
+
+@router.get("/{material_id}/preview")
+def preview_material(
+    material_id: str,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_user_settings),
+) -> Response:
+    material = db.get(Material, material_id)
+    if material is None:
+        raise HTTPException(status_code=404, detail="资料不存在")
+    return preview_document(settings.uploads_dir, "materials", material.stored_filename, max_bytes=MAX_UPLOAD_BYTES)
 
 
 @router.delete(

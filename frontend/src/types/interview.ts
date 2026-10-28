@@ -26,6 +26,17 @@ export interface OverallStatistics {
   average_score: number | null
 }
 
+export interface CompletedScorePoint {
+  session_id: string
+  created_at: string
+  average_score: number
+  scored_answers: number
+}
+
+export interface CompletedScoreHistory {
+  points: CompletedScorePoint[]
+}
+
 export interface HealthResponse {
   status: string
   service?: string

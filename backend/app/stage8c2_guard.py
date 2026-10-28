@@ -19,7 +19,7 @@ from app.stage11_local import is_legacy_owner, user_root
 
 _RESOURCE_PATH = re.compile(r"^/api/(resumes|materials|interviews)/([^/]+)(?:/|$)")
 _RESOURCE_KIND = {"resumes": "resume", "materials": "material", "interviews": "session"}
-_INTERVIEW_STATIC = {"history", "statistics"}
+_INTERVIEW_STATIC = {"history", "statistics", "score-history"}
 _MAX_BODY = 128 * 1024
 
 

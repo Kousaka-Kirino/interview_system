@@ -16,6 +16,7 @@
 | POST | `/api/resumes` | 1B | 上传并解析简历 |
 | GET | `/api/resumes` | 1B | 简历列表 |
 | GET | `/api/resumes/{resume_id}` | 1B | 简历详情 |
+| PATCH | `/api/resumes/{resume_id}` | 第二组 | 手动修正当前账号的简历结构化内容 |
 | DELETE | `/api/resumes/{resume_id}` | 1B | 删除简历 |
 | POST | `/api/materials` | 2 | 上传补充资料并建立向量索引 |
 | GET | `/api/materials` | 2 | 补充资料列表 |
@@ -27,6 +28,7 @@
 | POST | `/api/interviews/{session_id}/finish` | 3 | 提前结束会话 |
 | GET | `/api/interviews/history` | 4 | 答辩历史、分页、筛选 |
 | GET | `/api/interviews/statistics` | 4 | 全局统计 |
+| GET | `/api/interviews/score-history` | 第六组 | 最近 20 场有评分的已完成答辩走势，只读 |
 | GET | `/api/interviews/{session_id}/report` | 4 | 离线规则报告 |
 | POST | `/api/interviews/{session_id}/report/ai` | 4 | 可选 DeepSeek AI 报告/缓存 |
 
@@ -38,7 +40,7 @@
 - `204 No Content` 无响应体，客户端不要强行按 JSON 解析。
 - `404` 对象不存在，`409` 会话状态/题目冲突，`422` 参数校验失败，`503` 外部 LLM、Embedding 或索引服务不可用。
 - SQLite 及向量文件在本机；调用 DeepSeek 时可能发送用户简历、回答及选中资料片段。
-- 当前没有鉴权，API 仅供本机原型使用。
+- 当前 Stage 13 采用本地账号 Cookie、CSRF 来源限制和账户业务数据库隔离；除 `/api/auth/*` 的特定公开端点外，接口一般要求登录。
 
 ## 3. 基础/配置接口
 
@@ -69,16 +71,25 @@
 | 成功 | 201，`ResumeDetail` |
 | 常见错误 | 413 超限、415 文件类型错误、422 空文件或无法解析 |
 
-返回详情字段：`id`、`original_filename`、`file_size`、`created_at`、`full_text`、`structured_data`。上传时不调用 DeepSeek。
+返回详情字段：`id`、`original_filename`、`file_size`、`created_at`、`full_text`、`structured_data`、`quality`。上传时不调用 DeepSeek。
 
 ### GET `/api/resumes`
 
-- HTTP 200：`ResumeInfo[]`；每项包含 `id`、`original_filename`、`file_size`、`created_at`。
+- HTTP 200：`ResumeInfo[]`；每项包含 `id`、`original_filename`、`file_size`、`created_at`、`quality`。
 - 空列表返回 `[]`，不包含原文。
 
 ### GET `/api/resumes/{resume_id}`
 
 - HTTP 200：`ResumeDetail`，包含 `full_text` 和 `structured_data`；不存在 404。
+
+### PATCH `/api/resumes/{resume_id}`（第二组新增）
+
+- 要求已登录当前账户，发送 `Content-Type: application/json`，字段：`name`、`email`、`phone`（字符串或 null），以及 `sections`（必须完整包含 `profile`、`education`、`experience`、`projects`、`skills`、`awards`、`other` 七个键，每个键为字符串数组）。
+- 额外字段拒绝；每章最多 150 行、每行最多 2000 字；所有章节文字合计最多 30000 字。
+- HTTP 200 返回更新后的 `ResumeDetail`；404 不存在或不属于当前账户，422 格式错误，500 保存失败。
+- 仅覆盖 `structured_data` 内对应字段，标记 `manual_reviewed=true`；不改 `full_text` 或上传文件，也不要求数据库迁移。
+- 所有简历响应中的 `quality` 格式为 `{filled, total:7, missing_sections}`；表示七章节**非空完整度**，不是 OCR/语义正确率。`profile` 为空但姓名/邮箱/电话有值时，计为已填写。
+- 新建答辩及其后续问答的模型上下文优先包含人工修正内容，原始提取文本作为参考；已有未修正旧记录仍保持原有输入逻辑。
 
 ### DELETE `/api/resumes/{resume_id}`
 
@@ -710,3 +721,42 @@ The new configuration value `answer_minutes` (conceptual only; not sent as an AP
 
 Local signup, user-specific SQLite/upload/Chroma workspaces, authentication and rollback details:
 See `docs/STAGE11_LOCAL_REGISTRATION.md`.
+
+---
+
+## 第三组增量接口：已上传文件的安全原文预览（2026-10-27）
+
+> 此节适用于已安装第二组简历纠错补丁以及第三组预览补丁的版本。接口均需要现有登录会话和资源所有权校验；不允许跨账号查看，也不提供任意本地路径访问。
+
+### `GET /api/resumes/{resume_id}/preview`
+
+- 200：已保存的 PDF 返回 `application/pdf`、`Content-Disposition: inline`，为文件原始字节；DOCX 返回 `text/plain; charset=utf-8`，为**从当前保存的原文件即时提取**的文字，而不是人工修订的 `structured_data`。
+- 404：简历不存在、未授权或原文件丢失。
+- 422：文件损坏、过大或无法提取文字。
+- 响应设置 `Cache-Control: private, no-store` 与 `X-Content-Type-Options: nosniff`。
+
+### `GET /api/materials/{material_id}/preview`
+
+- 规则与简历一致；文件大小上限按资料原上传规则 12 MiB 检查。
+- PPTX 上传流程实际保存的是带 `_PPTX文字提取版.docx` 后缀的派生文件。该接口预览的是**DOCX 派生文件内的文字**，并非原始 PPTX 幻灯片；不包含图片、截图、复杂图表和排版。
+- 当前不新增 `.pptx` 原件存储或 OCR，也不触碰已有 SQLite/Chroma 数据。
+
+### 安全约束
+
+- 文件路径由当前用户的 `settings.uploads_dir` + 固定分类目录 + **数据库已登记的服务端文件名**构成，不接受前端提交的本地路径。
+- 严格限制 UUID 文件名、允许的后缀、文件大小和路径范围；拒绝软链接及目录穿越。
+- 资源的归属限制由现有的认证、用户专属数据库与 `OwnerScopeMiddleware` 执行。
+- 前端 PDF 经已登录的同源请求取得 Blob 临时 URL，关闭弹窗释放临时 URL，不写入浏览器永久缓存。
+
+
+## 第六组 Stage 19 — 数据概览评分走势接口
+
+### `GET /api/interviews/score-history`
+
+- **认证**：使用既有 Stage 13 登录中间件，获取当前账户独立 SQLite 数据；不允许由请求指定其他用户，未登录一般返回 401。
+- **响应 200**：`{ "points": [...] }`。每项：`session_id: string`、`created_at: datetime`、`average_score: number`、`scored_answers: integer`；按时间升序返回，最多 20 项；没有有效已完成场次时返回空数组。
+- **统计口径**：仅 `status=completed` 且 `answer` 和 `score` 都非空的题目入选；场均分由该场有效分数平均后四舍五入到两位小数。真实 0 分计入；无分数场次不计入。
+- **与现有 statistics 的区别**：`/statistics.average_score` 是**所有已评分回答**的整体均分（可含进行中场次），用于历史平均分与评级；`/score-history` 每点是**一场已完成答辩**的有效均分，用于近两场环比与趋势。两者不应直接相减。
+- **副作用**：无写入、无 LLM/Embedding 调用；不增加数据库迁移。路由必须在 `/{session_id}/report` 动态路由之前注册；同时加入 `stage8c2_guard.py` 的静态路由集合，避免被归属中间件当成会话 ID。
+
+具体界面规则、评级阈值、测试以及安装方式见 `docs/UI_POLISH_PHASE6.md`。

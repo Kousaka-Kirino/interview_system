@@ -27,6 +27,18 @@ class OverallStatistics(BaseModel):
     answered_turns: int
     average_score: float | None
 
+class CompletedScorePoint(BaseModel):
+    session_id: str
+    created_at: datetime
+    average_score: float
+    scored_answers: int
+
+
+class CompletedScoreHistory(BaseModel):
+    # Most recent completed sessions with at least one scored answer, chronological.
+    points: list[CompletedScorePoint]
+
+
 class ScorePoint(BaseModel):
     turn_id: int
     question_number: int

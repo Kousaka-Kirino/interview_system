@@ -15,11 +15,14 @@ import InterviewReportPage from './pages/InterviewReportPage'
 
 type Tab = 'dashboard' | 'resumes' | 'materials' | 'configure' | 'session' | 'report'
 
-type Route = { tab: Tab; sessionId?: string }
+type Route = { tab: Tab; sessionId?: string; resumeId?: string }
 
 function readRoute(): Route {
   const hash = decodeURIComponent(window.location.hash.replace(/^#/, ''))
   if (hash === 'resumes' || hash === 'materials') return { tab: hash }
+  if (hash.startsWith('resumes/') && hash.slice('resumes/'.length)) {
+    return { tab: 'resumes', resumeId: hash.slice('resumes/'.length) }
+  }
   if (hash === 'configure' || hash === 'interview') return { tab: 'configure' }
   if (hash.startsWith('session/') && hash.slice('session/'.length)) {
     return { tab: 'session', sessionId: hash.slice('session/'.length) }
@@ -70,7 +73,7 @@ export default function App() {
         </div>
       </nav>
       {route.tab === 'dashboard' && <DashboardPage />}
-      {route.tab === 'resumes' && <ResumesPage />}
+      {route.tab === 'resumes' && <ResumesPage key={route.resumeId ?? 'list'} initialResumeId={route.resumeId} />}
       {route.tab === 'materials' && <MaterialsPage />}
       {route.tab === 'configure' && <InterviewConfigPage />}
       {route.tab === 'session' && route.sessionId && <InterviewSessionPage key={route.sessionId} sessionId={route.sessionId} />}

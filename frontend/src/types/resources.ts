@@ -1,8 +1,24 @@
+export type ResumeSectionKey = 'profile' | 'education' | 'experience' | 'projects' | 'skills' | 'awards' | 'other'
+
+export interface ResumeQuality {
+  filled: number
+  total: number
+  missing_sections: ResumeSectionKey[]
+}
+
+export interface ResumeCorrections {
+  name: string
+  email: string
+  phone: string
+  sections: Record<ResumeSectionKey, string[]>
+}
+
 export interface ResumeInfo {
   id: string
   original_filename: string
   file_size: number
   created_at: string
+  quality: ResumeQuality
 }
 
 export interface ResumeDetail extends ResumeInfo {

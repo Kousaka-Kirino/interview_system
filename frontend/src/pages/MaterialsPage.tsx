@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
+  Eye,
   FileSearch,
   Files,
   LoaderCircle,
@@ -9,6 +10,7 @@ import {
   UploadCloud,
 } from 'lucide-react'
 import { materialApi } from '../lib/api'
+import DocumentPreview from '../components/DocumentPreview'
 import { formatDate, formatSize, messageOf, validateDocument } from '../lib/resources'
 import type { MaterialInfo, MaterialSearchHit } from '../types/resources'
 
@@ -24,6 +26,7 @@ function validateMaterialFile(file: File | null): string | null {
 
 export default function MaterialsPage() {
   const [items, setItems] = useState<MaterialInfo[]>([])
+  const [previewFile, setPreviewFile] = useState<{ id: string; name: string } | null>(null)
   const [refresh, setRefresh] = useState(0)
   const [loading, setLoading] = useState(true)
   const [listError, setListError] = useState<string | null>(null)
@@ -204,6 +207,8 @@ export default function MaterialsPage() {
                         <p className="mt-1 text-xs text-slate-400">{formatSize(item.file_size)} · {item.chunk_count} 个片段 · {formatDate(item.created_at)}</p>
                       </div>
                     </label>
+                    <button type="button" onClick={() => setPreviewFile({ id: item.id, name: item.original_filename })}
+                      className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-sm text-cyan-200 hover:bg-white/10"><Eye className="size-4" /> 预览原文</button>
                     <button
                       type="button" disabled={deletingId !== null || uploading || searching} onClick={() => void remove(item)}
                       className="inline-flex items-center gap-1 rounded-lg border border-rose-400/25 px-3 py-2 text-sm text-rose-300 hover:bg-rose-400/10 disabled:opacity-50"
@@ -269,6 +274,7 @@ export default function MaterialsPage() {
           </div>}
         </section>
       </div>
+      {previewFile && <DocumentPreview kind="material" file={previewFile} onClose={() => setPreviewFile(null)} />}
     </main>
   )
 }

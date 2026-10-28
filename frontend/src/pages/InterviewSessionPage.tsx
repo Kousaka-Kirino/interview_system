@@ -16,6 +16,8 @@ import {
   getInterviewReport,
 } from '../lib/interviews'
 import { messageOf } from '../lib/resources'
+import { appendRecognizedText, VOICE_STATUS_EVENT, VOICE_TRANSCRIPT_EVENT, TIMER_GATE_EVENT } from '../lib/answerDraftBridge'
+import type { TurnStatusDetail, VoiceTranscriptDetail } from '../lib/answerDraftBridge'
 import type {
   InterviewEvaluation,
   InterviewReport,
@@ -25,10 +27,9 @@ import type {
 } from '../types/interview'
 
 const difficultyFeedback: Array<{ value: UserDifficultyFeedback; label: string }> = [
-  { value: 'none', label: '无特别反馈' },
-  { value: 'too_easy', label: '这题偏简单' },
-  { value: 'just_right', label: '难度合适' },
-  { value: 'too_hard', label: '这题偏困难' },
+  { value: 'too_hard', label: '😱 太难' },
+  { value: 'just_right', label: '😐 刚好' },
+  { value: 'too_easy', label: '😎 太简单' },
 ]
 
 function answered(turn: InterviewTurn) {
@@ -48,6 +49,8 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
   const [notice, setNotice] = useState('')
   const [answer, setAnswer] = useState('')
   const [feedback, setFeedback] = useState<UserDifficultyFeedback>('none')
+  const [voiceBusy, setVoiceBusy] = useState(false)
+  const [timerBlocked, setTimerBlocked] = useState(false)
   const [busy, setBusy] = useState<'answer' | 'finish' | null>(null)
   const [evaluation, setEvaluation] = useState<InterviewEvaluation | null>(null)
   const [report, setReport] = useState<InterviewReport | null>(null)
@@ -64,6 +67,9 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
     setEvaluation(null)
     setNotice('')
     setAnswer('')
+    setFeedback('none')
+    setVoiceBusy(false)
+    setTimerBlocked(false)
     getInterview(sessionId, controller.signal)
       .then((data) => { if (live) setSession(data) })
       .catch((error: unknown) => {
@@ -93,8 +99,41 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
   const currentQuestion = pending && !answered(pending) ? pending : null
   const completedTurns = session?.turns.filter(answered) ?? []
 
+  useEffect(() => {
+    // Do not carry busy/timing status from the previous question into the next one.
+    setVoiceBusy(false)
+    setTimerBlocked(false)
+  }, [sessionId, currentQuestion?.id])
+
+  useEffect(() => {
+    const openTurnId = currentQuestion ? String(currentQuestion.id) : null
+    function matches(detail: TurnStatusDetail | VoiceTranscriptDetail | undefined): boolean {
+      return !!detail && !!openTurnId && detail.sessionId === sessionId && detail.turnId === openTurnId
+    }
+    const onTranscript = (event: Event) => {
+      const detail = (event as CustomEvent<VoiceTranscriptDetail>).detail
+      if (matches(detail)) setAnswer((existing) => appendRecognizedText(existing, detail.text).slice(0, 10000))
+    }
+    const onVoice = (event: Event) => {
+      const detail = (event as CustomEvent<TurnStatusDetail>).detail
+      if (matches(detail)) setVoiceBusy(detail.active)
+    }
+    const onTimer = (event: Event) => {
+      const detail = (event as CustomEvent<TurnStatusDetail>).detail
+      if (matches(detail)) setTimerBlocked(detail.active)
+    }
+    window.addEventListener(VOICE_TRANSCRIPT_EVENT, onTranscript)
+    window.addEventListener(VOICE_STATUS_EVENT, onVoice)
+    window.addEventListener(TIMER_GATE_EVENT, onTimer)
+    return () => {
+      window.removeEventListener(VOICE_TRANSCRIPT_EVENT, onTranscript)
+      window.removeEventListener(VOICE_STATUS_EVENT, onVoice)
+      window.removeEventListener(TIMER_GATE_EVENT, onTimer)
+    }
+  }, [sessionId, currentQuestion?.id])
+
   async function submitAnswer() {
-    if (!session || !currentQuestion || busy) return
+    if (!session || !currentQuestion || busy || voiceBusy || timerBlocked) return
     const normalized = answer.trim()
     if (!normalized) { setActionError('请先输入回答。'); return }
     if (normalized.length > 10000) { setActionError('回答最多 10000 字符。'); return }
@@ -120,8 +159,12 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
   }
 
   async function finish() {
-    if (!session || busy) return
-    if (!window.confirm('确认提前结束本次答辩？结束后无法继续回答。')) return
+    if (!session || busy || voiceBusy) return
+    const open = session.turns.find((turn) => turn.answer === null)
+    const pendingMessage = open
+      ? `未答的第 ${open.question_number} 道主问题${open.followup_number ? `（第 ${open.followup_number} 次追问）` : ''}不会计入已回答题目，复盘中仍会记录未答数量。\n\n`
+      : ''
+    if (!window.confirm(`${pendingMessage}确定提前结束本次答辩？结束后无法继续回答。`)) return
     setBusy('finish')
     setActionError('')
     try {
@@ -174,24 +217,24 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
 
             <section className="rounded-2xl border border-white/10 bg-slate-900/75 p-5 sm:p-6">
               <h2 className="mb-5 text-lg font-semibold">本场问答记录</h2>
-              <div className="space-y-5">
-                {session.turns.map((turn) => (
-                  <article key={turn.id} className={`rounded-xl border p-4 ${turn.id === currentQuestion?.id ? 'border-cyan-400/40 bg-cyan-400/5' : 'border-white/10 bg-slate-950/40'}`}>
-                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                      <span>第 {turn.question_number} 道主问题{turn.followup_number ? ` · 第 ${turn.followup_number} 次追问` : ''}</span>
-                      <span>难度 {turn.difficulty} / 5</span>
+              <div className="space-y-3">
+                {completedTurns.length === 0 && <p className="text-sm text-slate-400">暂无已回答题目，请在下方回答当前题。</p>}
+                {completedTurns.map((turn) => (
+                  <details key={turn.id} className="group rounded-xl border border-white/10 bg-slate-950/40">
+                    <summary className="cursor-pointer list-none rounded-xl px-4 py-3 text-sm text-slate-200 marker:hidden hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400">
+                      <span className="flex flex-wrap items-center justify-between gap-2">
+                        <span>第 {turn.question_number} 道主问题{turn.followup_number ? ` · 第 ${turn.followup_number} 次追问` : ''} <span className="ml-1 text-emerald-300">✓ 已回答</span></span>
+                        <span className="text-cyan-300">{scoreLabel(turn.score)} 分 <span className="ml-2 text-slate-400 group-open:hidden">展开详情 ▾</span><span className="ml-2 hidden text-slate-400 group-open:inline">收起 ▴</span></span>
+                      </span>
+                    </summary>
+                    <div className="border-t border-white/10 px-4 py-4">
+                      <p className="mb-1 text-xs text-slate-400">难度 {turn.difficulty} / 5</p>
+                      <p className="whitespace-pre-wrap font-medium leading-7">{turn.question}</p>
+                      <p className="mt-4 text-xs font-semibold text-cyan-300">你的回答</p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">{turn.answer}</p>
+                      {turn.feedback && <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-400">AI 给出的建议：{turn.feedback}</p>}
                     </div>
-                    <p className="whitespace-pre-wrap text-base font-medium leading-7 text-slate-100">{turn.question}</p>
-                    {turn.answer !== null && (
-                      <div className="mt-4 border-t border-white/10 pt-4">
-                        <p className="mb-2 text-xs font-semibold text-cyan-300">你的回答</p>
-                        <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300">{turn.answer}</p>
-                        <p className="mt-3 text-sm font-semibold text-slate-100">评分：{scoreLabel(turn.score)}</p>
-                        {turn.feedback && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-400">AI 给出的建议：{turn.feedback}</p>}
-                      </div>
-                    )}
-                    {turn.id === currentQuestion?.id && <p className="mt-3 text-xs text-cyan-300">请在下方输入这道题的回答</p>}
-                  </article>
+                  </details>
                 ))}
               </div>
             </section>
@@ -205,25 +248,36 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
             {session.status === 'active' && currentQuestion && (
               <section className="mt-6 rounded-2xl border border-cyan-400/20 bg-slate-900 p-5 sm:p-6">
                 <h2 className="mb-3 text-lg font-semibold">回答当前题目</h2>
+                <div className="mb-5 rounded-xl border border-cyan-400/25 bg-cyan-400/5 p-4">
+                  <p className="mb-2 text-xs text-cyan-300">第 {currentQuestion.question_number} 道主问题{currentQuestion.followup_number ? ` · 第 ${currentQuestion.followup_number} 次追问` : ''} · 难度 {currentQuestion.difficulty}/5</p>
+                  <p className="whitespace-pre-wrap font-medium leading-7">{currentQuestion.question}</p>
+                </div>
                 <label htmlFor="current-answer" className="block text-sm text-slate-400">回答内容（最多 10000 字符）</label>
                 <textarea id="current-answer" rows={7} maxLength={10000} value={answer} disabled={!!busy}
-                  onChange={(event) => setAnswer(event.target.value)} placeholder="在此输入你的回答…"
+                  onChange={(event) => setAnswer(event.target.value)} placeholder="在此输入回答，或点击上方麦克风将识别文字追加到这里…"
                   className="mt-2 w-full resize-y rounded-xl border border-white/15 bg-slate-950 p-4 text-sm leading-6 text-white focus:border-cyan-400 focus:outline-none disabled:opacity-50" />
                 <div className="mt-2 text-right text-xs text-slate-500">{answer.length} / 10000</div>
-                <label htmlFor="difficulty-feedback" className="mt-4 block text-sm text-slate-300">这道题的难度感受（可选）</label>
-                <select id="difficulty-feedback" value={feedback} disabled={!!busy}
-                  onChange={(event) => setFeedback(event.target.value as UserDifficultyFeedback)}
-                  className="mt-2 w-full rounded-xl border border-white/15 bg-slate-950 px-3 py-2 text-sm text-white sm:w-auto">
-                  {difficultyFeedback.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                </select>
+                <fieldset className="mt-4">
+                  <legend className="text-sm text-slate-300">这道题的难度感受（可选，提交时一并保存）</legend>
+                  <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="难度感受">
+                    {difficultyFeedback.map((item) => (
+                      <button key={item.value} type="button" aria-pressed={feedback === item.value} disabled={!!busy}
+                        onClick={() => setFeedback((previous) => previous === item.value ? 'none' : item.value)}
+                        className={`rounded-xl border px-3 py-2 text-sm transition-colors disabled:opacity-40 ${feedback === item.value ? 'border-cyan-300 bg-cyan-400/20 text-cyan-100' : 'border-white/15 bg-slate-950 text-slate-300 hover:bg-white/10'}`}>
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+                {(voiceBusy || timerBlocked) && <p role="status" className="mt-3 text-xs text-amber-200">{voiceBusy ? '录音、转写或跳过操作进行中，请完成后提交。' : '计时已到，请先在超时提示中选择继续或结束。'}</p>}
                 {actionError && <p role="alert" className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{actionError}</p>}
                 {notice && <p role="status" className="mt-4 text-sm text-emerald-300">{notice}</p>}
                 <div className="mt-5 flex flex-wrap justify-end gap-3">
-                  <button type="button" onClick={finish} disabled={!!busy}
+                  <button type="button" onClick={finish} disabled={!!busy || voiceBusy}
                     className="inline-flex items-center gap-2 rounded-xl border border-rose-400/30 px-4 py-3 text-sm text-rose-200 hover:bg-rose-400/10 disabled:opacity-40">
                     {busy === 'finish' ? <LoaderCircle className="size-4 animate-spin" /> : <Square className="size-4" />} 提前结束
                   </button>
-                  <button type="button" onClick={submitAnswer} disabled={!!busy || !answer.trim()}
+                  <button type="button" onClick={submitAnswer} disabled={!!busy || voiceBusy || timerBlocked || !answer.trim()}
                     className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-300 disabled:opacity-40">
                     {busy === 'answer' ? <LoaderCircle className="size-4 animate-spin" /> : <Send className="size-4" />}
                     {busy === 'answer' ? '评估并生成下一题…' : '提交回答'}

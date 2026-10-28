@@ -10,12 +10,16 @@ import {
   RefreshCw,
   ExternalLink,
   Server,
+  TrendingUp,
   TriangleAlert,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { interviewApi } from '../lib/api'
+import ScoreHistoryChart from '../components/dashboard/ScoreHistoryChart'
+import { changeDescription, practiceRating, sessionChange } from '../lib/scoreInsights'
 import type {
   HistoryItem,
+  CompletedScoreHistory,
   HistoryPage,
   InterviewStatus,
   OverallStatistics,
@@ -132,6 +136,9 @@ export default function DashboardPage() {
   const [refreshCount, setRefreshCount] = useState(0)
   const [stats, setStats] = useState<OverallStatistics | null>(null)
   const [history, setHistory] = useState<HistoryPage | null>(null)
+  const [scoreHistory, setScoreHistory] = useState<CompletedScoreHistory | null>(null)
+  const [trendLoading, setTrendLoading] = useState(true)
+  const [trendError, setTrendError] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -170,6 +177,33 @@ export default function DashboardPage() {
     }
   }, [filter, offset, refreshCount])
 
+  // The chart is independent from the list and summary: a trend API error must
+  // not blank existing dashboard numbers. Filtering/paging does not refetch it.
+  useEffect(() => {
+    const controller = new AbortController()
+    let current = true
+    setTrendLoading(true)
+    setTrendError(false)
+    interviewApi.scoreHistory(controller.signal)
+      .then((result) => {
+        if (current) setScoreHistory(result)
+      })
+      .catch((reason: unknown) => {
+        if (!current || (reason instanceof Error && reason.name === 'AbortError')) return
+        setScoreHistory(null)
+        setTrendError(true)
+      })
+      .finally(() => {
+        if (current) setTrendLoading(false)
+      })
+    return () => {
+      current = false
+      controller.abort()
+    }
+  }, [refreshCount])
+
+  const rating = practiceRating(stats?.average_score ?? null)
+  const delta = sessionChange(scoreHistory?.points ?? [])
   const total = history?.total ?? 0
   const page = Math.floor(offset / PAGE_SIZE) + 1
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -230,6 +264,28 @@ export default function DashboardPage() {
           <SummaryCard label="已完成" value={stats?.completed_sessions ?? (loading ? '…' : '—')} caption="正常完成或提前结束" icon={CheckCircle2} />
           <SummaryCard label="已回答题目" value={stats?.answered_turns ?? (loading ? '…' : '—')} caption="已记录的主问题与追问回答" icon={Activity} />
           <SummaryCard label="历史平均分" value={stats ? scoreText(stats.average_score) : loading ? '…' : '—'} caption="仅供练习参考" icon={BookOpenText} />
+        </section>
+
+        <section aria-label="评分变化与历史走势" className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+          <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-5">
+            <div className="flex items-center gap-2"><TrendingUp aria-hidden="true" className="size-5 text-cyan-300" /><h2 className="text-lg font-semibold text-white">表现概览</h2></div>
+            <p className="mt-5 text-sm text-slate-400">练习评级（基于历史回答均分）</p>
+            <p className="mt-2 text-xl font-semibold text-white" aria-label="练习评级">{loading ? '加载中…' : error ? '数据暂不可用' : rating?.label ?? '暂无评级'}</p>
+            <p className="mt-2 text-xs text-slate-500">良好 ≥ 80 · 待提升 60–79.9 · 需加强 &lt; 60</p>
+            <div className="my-5 border-t border-white/10" />
+            <p className="text-sm text-slate-400">最近两场有效答辩对比</p>
+            <p className={`mt-2 text-lg font-semibold ${delta !== null && delta > 0 ? 'text-emerald-300' : delta !== null && delta < 0 ? 'text-amber-300' : 'text-slate-200'}`} aria-live="polite">
+              {trendLoading ? '加载中…' : trendError ? '趋势暂不可用' : changeDescription(delta)}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-slate-500">对比最近两场有评分的已完成答辩的场均分，不等于与历史全部回答均分比较；评级与变化仅供练习参考。</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-5">
+            <h2 className="text-lg font-semibold text-white">分数走势</h2>
+            <p className="mt-1 text-xs text-slate-400">最多显示最近 20 场有评分的已完成答辩</p>
+            {trendLoading ? <p role="status" className="py-12 text-center text-sm text-slate-400">正在加载走势…</p>
+              : trendError ? <p className="py-12 text-center text-sm text-rose-200">暂时无法获取趋势数据；统计卡与历史列表仍可使用。</p>
+              : scoreHistory ? <ScoreHistoryChart history={scoreHistory} /> : null}
+          </div>
         </section>
 
         <section aria-label="历史答辩列表" className="mt-10 overflow-hidden rounded-2xl border border-white/10 bg-slate-900/80 shadow-2xl shadow-slate-950/20">
@@ -307,7 +363,7 @@ export default function DashboardPage() {
             </div>
           </footer>
         </section>
-        <p className="mt-8 text-center text-xs text-slate-500">本机单用户开发版本 · 复盘默认离线，AI 深度分析需主动触发</p>
+        <p className="mt-8 text-center text-xs text-slate-500">分数和评级仅供练习参考，不能代替真实答辩评价</p>
       </div>
     </main>
   )

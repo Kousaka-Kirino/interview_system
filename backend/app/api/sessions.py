@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.material import Material
 from app.models.resume import Resume
+from app.services.resume_parser import resume_context
 from app.models.session import (
     InterviewSession,
     InterviewTurn,
@@ -216,12 +217,12 @@ def start_interview(
     evidence = _get_evidence(
         store,
         ids,
-        resume.full_text[:350],
+        resume_context(resume.full_text, resume.structured_data)[:350],
     )
 
     question = _llm_question(
         llm,
-        resume_text=resume.full_text,
+        resume_text=resume_context(resume.full_text, resume.structured_data),
         evidence=evidence,
         previous=[],
         style=body.config.reviewer_style,
@@ -337,7 +338,7 @@ def submit_answer(
         grade = llm.grade_answer(
             question=current.question,
             answer=body.answer.strip(),
-            resume_text=resume.full_text,
+            resume_text=resume_context(resume.full_text, resume.structured_data),
         )
 
     except InterviewLLMError as exc:
@@ -426,7 +427,7 @@ def submit_answer(
 
         next_question = _llm_question(
             llm,
-            resume_text=resume.full_text,
+            resume_text=resume_context(resume.full_text, resume.structured_data),
             evidence=evidence,
             previous=dialogue,
             style=config.reviewer_style,

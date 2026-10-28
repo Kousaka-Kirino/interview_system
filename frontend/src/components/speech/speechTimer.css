@@ -1,4 +1,4 @@
-/* Stage 9 -- navy/cyan, consistent with the existing dashboard. */
+/* Microphone and countdown panel, consistent with the existing dashboard. */
 .stage9-portal-slot { width: 100%; display: block; margin: 0 0 22px; }
 .stage9-panel { box-sizing: border-box; width: 100%; max-width: 100%; padding: 17px 20px;
  background: #0e172b; border: 1px solid #293952; border-radius: 16px; color: #e8eefc;
@@ -21,10 +21,6 @@
 .stage9-button.stop { background:#7f1d1d75; border-color:#f87171; color:#fecaca; }
 .stage9-status { font-size: 12px; margin: 7px 0; color: #93c5fd; line-height: 1.7; }
 .stage9-error { color:#fecaca; font-size:12px; line-height:1.7; white-space:pre-wrap; }
-.stage9-textarea { box-sizing:border-box; width:100%; min-height: 85px; resize:vertical; padding:12px;
- margin-top: 10px; border:1px solid #334560; border-radius:10px; color:#eff6ff; background:#111e33;
- font: inherit; font-size: 14px; line-height: 1.7; outline:none; }
-.stage9-textarea:focus { border-color:#22d3ee; box-shadow:0 0 0 3px #06b6d428; }
 .stage9-modal-bg { position:fixed; inset:0; z-index:2147483520; display:grid; place-items:center;
  background:#020617d9; padding: 16px; }
 .stage9-modal { width:min(100%,440px); padding:25px; background:#0e172b; border:1px solid #475569;
@@ -33,54 +29,15 @@
 .stage9-modal p { color:#a9bad3; font-size:13px; line-height:1.8; }
 @media(max-width:650px) { .stage9-panel { padding:13px; } .stage9-timer {font-size:22px;} }
 
-/* Stage 9C: small navy duration control inside the existing defense configuration. */
-.stage9c-config-slot { display: block; width: 100%; margin: 14px 0 18px; }
-.stage9c-config { background:#0e172b; border:1px solid #293952; border-radius:15px; padding:15px 18px; color:#e8eefc; }
-.stage9c-config-head { display:flex; gap:12px; justify-content:space-between; align-items:center; font-weight:650; font-size:14px; }
-.stage9c-config-head span { color:#93a8c7; font-weight:500; font-size:12px; }
-.stage9c-config-row { display:flex; flex-wrap:wrap; align-items:center; gap:9px; margin-top:10px; }
-.stage9c-config input { width:106px; padding:9px 12px; border:1px solid #3b5273; border-radius:9px; color:#e8eefc; background:#101d33; font-size:15px; outline:none; }
-.stage9c-config input:focus { border-color:#22d3ee; box-shadow:0 0 0 2px #06b6d422; }
-.stage9c-config input[aria-invalid="true"] { border-color:#f87171; }
-.stage9c-unit { font-size:13px; color:#cbd5e1; }
-.stage9c-config-hint { font-size:12px; color:#67e8f9; }
-.stage9c-help { font-size:12px; line-height:1.7; color:#9aacc9; margin:9px 0 0; }
-.stage9c-error { margin-top:7px; color:#fca5a5; font-size:12px; }
-
-/* Stage 9D: center the settings with the existing configuration panel. */
-.stage9c-config-slot { box-sizing:border-box; width:100%; max-width:100%; margin:14px auto 18px; }
-.stage9c-config { box-sizing:border-box; width:100%; }
-.stage9d-duration-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
-.stage9d-duration-item { min-width:0; padding:12px 14px; background:#111e33;
-  border:1px solid #293952; border-radius:12px; }
-.stage9d-bottom-help { margin:13px 0 0; }
+/* Whole-session countdown display. Configuration fields live in InterviewConfigPage. */
 .stage9d-timer-pair { display:flex; gap:17px; align-items:center; flex-wrap:wrap; }
 .stage9d-timer-block { min-width:110px; display:flex; flex-direction:column; align-items:flex-end; }
 .stage9d-timer-block + .stage9d-timer-block { border-left:1px solid #293952; padding-left:17px; }
 .stage9d-timer-label { font-size:11px; color:#9aacc9; }
 @media(max-width:680px) {
-  .stage9d-duration-grid { grid-template-columns:1fr; }
   .stage9d-timer-pair { gap:12px; }
   .stage9d-timer-block + .stage9d-timer-block { padding-left:12px; }
   .stage9d-timer-block { min-width:86px; }
   .stage9d-timer-block .stage9-timer { font-size:21px; }
 }
 
-/* Stage 9E: use the gap under the materials picker, beside the difficulty card. */
-.stage9c-config-slot.stage9e-in-left {
-  box-sizing:border-box; width:100%; max-width:100%; margin:12px 0 0;
-}
-.stage9e-in-left .stage9c-config {
-  padding:0; margin:0; border:0; background:transparent; box-shadow:none;
-}
-.stage9e-in-left .stage9d-duration-grid { gap:10px; grid-template-columns:repeat(2,minmax(0,1fr)); }
-.stage9e-in-left .stage9d-duration-item { padding:11px 12px; background:#101c30; }
-.stage9e-in-left .stage9c-config-head { font-size:12px; }
-.stage9e-in-left .stage9c-config-head span { font-size:11px; white-space:nowrap; }
-.stage9e-in-left .stage9c-config-row { margin-top:8px; gap:7px; }
-.stage9e-in-left .stage9c-config input { width:76px; padding:7px 9px; font-size:14px; }
-.stage9e-in-left .stage9c-help:not(.stage9d-bottom-help) { display:none; }
-.stage9e-in-left .stage9d-bottom-help { font-size:11px; margin:8px 0 0; }
-@media (max-width:860px) {
-  .stage9e-in-left .stage9d-duration-grid { grid-template-columns:1fr; }
-}

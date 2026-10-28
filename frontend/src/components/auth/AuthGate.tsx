@@ -71,6 +71,11 @@ export default function AuthGate() {
     }
   }
   useEffect(() => { void check() }, [])
+  // Notify active pages when a user logs in, signs out or changes accounts.
+  // The event carries no profile details; each page verifies the current user with the server.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('interview-auth-change', { detail: { ready: mode === 'ready' } }))
+  }, [mode])
   useEffect(() => {
     if (mode !== 'ready') return
     const timer = window.setInterval(async () => {

@@ -1,5 +1,6 @@
 import type {
   HealthResponse,
+  CompletedScoreHistory,
   HistoryPage,
   InterviewStatus,
   OverallStatistics,
@@ -8,13 +9,14 @@ import type {
   MaterialInfo,
   MaterialSearchRequest,
   MaterialSearchResponse,
+  ResumeCorrections,
   ResumeDetail,
   ResumeInfo,
 } from '../types/resources'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
 
-type Method = 'GET' | 'POST' | 'DELETE'
+type Method = 'GET' | 'POST' | 'PATCH' | 'DELETE'
 
 export class ApiError extends Error {
   readonly status?: number
@@ -94,6 +96,36 @@ async function request<T>(
   return payload as T
 }
 
+export type DocumentPreviewResult =
+  | { kind: 'pdf'; blob: Blob }
+  | { kind: 'text'; text: string }
+
+async function requestDocumentPreview(path: string, signal: AbortSignal): Promise<DocumentPreviewResult> {
+  let response: Response
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: 'GET',
+      headers: { Accept: 'application/pdf, text/plain, application/json' },
+      signal,
+    })
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') throw error
+    throw new ApiError('无法连接后端，请确认 FastAPI 正在运行。')
+  }
+  if (!response.ok) {
+    const payload: unknown = await response.json().catch(() => null)
+    throw new ApiError(getErrorDetail(payload, response.status), response.status)
+  }
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+  if (contentType.startsWith('application/pdf')) {
+    return { kind: 'pdf', blob: await response.blob() }
+  }
+  if (contentType.startsWith('text/plain')) {
+    return { kind: 'text', text: await response.text() }
+  }
+  throw new ApiError('后端返回了不支持的预览格式。')
+}
+
 function fileBody(file: File): FormData {
   const form = new FormData()
   form.append('file', file)
@@ -105,6 +137,8 @@ export const interviewApi = {
     request<HealthResponse>('/api/health', { signal }),
   statistics: (signal?: AbortSignal) =>
     request<OverallStatistics>('/api/interviews/statistics', { signal }),
+  scoreHistory: (signal?: AbortSignal) =>
+    request<CompletedScoreHistory>('/api/interviews/score-history', { signal }),
   history: (
     options: { status?: InterviewStatus; limit: number; offset: number },
     signal?: AbortSignal,
@@ -124,6 +158,10 @@ export const resumeApi = {
     request<ResumeDetail>(`/api/resumes/${encodeURIComponent(id)}`, { signal }),
   upload: (file: File) =>
     request<ResumeDetail>('/api/resumes', { method: 'POST', body: fileBody(file) }),
+  update: (id: string, changes: ResumeCorrections) =>
+    request<ResumeDetail>(`/api/resumes/${encodeURIComponent(id)}`, { method: 'PATCH', body: changes }),
+  preview: (id: string, signal: AbortSignal) =>
+    requestDocumentPreview(`/api/resumes/${encodeURIComponent(id)}/preview`, signal),
   remove: (id: string) =>
     request<void>(`/api/resumes/${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }
@@ -136,6 +174,8 @@ export const materialApi = {
       file.name.toLowerCase().endsWith('.pptx') ? '/api/pptx-import' : '/api/materials',
       { method: 'POST', body: fileBody(file) },
     ),
+  preview: (id: string, signal: AbortSignal) =>
+    requestDocumentPreview(`/api/materials/${encodeURIComponent(id)}/preview`, signal),
   remove: (id: string) =>
     request<void>(`/api/materials/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   search: (body: MaterialSearchRequest) =>

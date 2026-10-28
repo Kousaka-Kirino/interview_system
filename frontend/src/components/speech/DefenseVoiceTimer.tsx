@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import './speechTimer.css'
-import { DEFAULT_MINUTES, MAX_MINUTES, PREFERRED_MINUTES_KEY,
-  PREFERRED_TOTAL_MINUTES_KEY, durationForSession, totalMinutesForSession,
-  parseMinutes, sessionMinutesKey, sessionTotalMinutesKey, sessionTotalDeadlineKey,
+import { announceTranscript, announceVoiceStatus, announceTimerGate } from '../../lib/answerDraftBridge'
+import { DEFAULT_MINUTES, durationForSession, totalMinutesForSession,
+  sessionTotalDeadlineKey,
   sessionTotalContinueKey, stableDeadline } from './defenseTime'
 
 type Turn = {
@@ -49,232 +49,7 @@ function recordedFileExtension(mime: string): string {
   return 'webm'
 }
 
-/** The existing #configure form remains unchanged; this one field is added through a portal. */
-function DefenseTimeSetting() {
-  const [isConfig, setIsConfig] = useState(() => /^#(?:configure|interview)(?:\?.*)?$/.test(window.location.hash))
-  const [slot, setSlot] = useState<HTMLElement | null>(null)
-  const [minutesText, setMinutesText] = useState(() => {
-    try { return String(parseMinutes(window.localStorage.getItem(PREFERRED_MINUTES_KEY)) ?? DEFAULT_MINUTES) }
-    catch { return String(DEFAULT_MINUTES) }
-  })
-  const [totalMinutesText, setTotalMinutesText] = useState(() => {
-    try { return String(parseMinutes(window.localStorage.getItem(PREFERRED_TOTAL_MINUTES_KEY)) ?? 0) }
-    catch { return '0' }
-  })
-  const inputRef = useRef(minutesText)
-  const totalInputRef = useRef(totalMinutesText)
-  inputRef.current = minutesText
-  totalInputRef.current = totalMinutesText
-  const valid = parseMinutes(minutesText) !== null
-  const totalValid = parseMinutes(totalMinutesText) !== null
-  const noLimitSelected = parseMinutes(minutesText) === 0
-  const totalUnlimited = parseMinutes(totalMinutesText) === 0
-
-  useEffect(() => {
-    const sync = () => setIsConfig(/^#(?:configure|interview)(?:\?.*)?$/.test(window.location.hash))
-    window.addEventListener('hashchange', sync)
-    return () => window.removeEventListener('hashchange', sync)
-  }, [])
-
-  useEffect(() => {
-    if (!isConfig) { setSlot(null); return }
-    const node = document.createElement('div')
-    node.className = 'stage9c-config-slot'
-    let active = true
-    const position = () => {
-      if (!active) return
-      const forms = Array.from(document.querySelectorAll<HTMLFormElement>('main form'))
-      const form = forms.find((item) => item.getClientRects().length > 0)
-      const main = Array.from(document.querySelectorAll<HTMLElement>('main'))
-        .find((item) => item.getClientRects().length > 0)
-      const host = form ?? main
-      if (!host) { node.remove(); return }
-      // Stage 9E: prefer the empty left area underneath the materials selection.
-      // Do not move React-managed panels: only move our OWN portal host node.
-      const findLabel = (pattern: RegExp): HTMLElement | null => {
-        const scope = main ?? form ?? document.body
-        const nodes = Array.from(scope.querySelectorAll<HTMLElement>(
-          'h2,h3,h4,h5,h6,label,legend,p,span,div,strong,small'
-        ))
-        return nodes.find((element) => {
-          if (!element.getClientRects().length || element === node || node.contains(element)) return false
-          const own = Array.from(element.childNodes)
-            .filter((child) => child.nodeType === Node.TEXT_NODE)
-            .map((child) => child.textContent ?? '').join('').trim()
-          return own.length > 0 && own.length < 110 && pattern.test(own)
-        }) ?? null
-      }
-      const difficulty = findLabel(/答辩强度|面试强度|初始难度|答辩难度|自适应程度/)
-      const materials = findLabel(/已选择\s*\d+\s*\/\s*\d+/)
-        ?? findLabel(/(?:补充资料|选择资料|知识库资料|补充材料)/)
-      let leftColumn: HTMLElement | null = null
-      if (materials && difficulty) {
-        // Find the closest two-column layout where materials occupy the left
-        // branch and difficulty the right branch. Never restructure the grid.
-        let parent: HTMLElement | null = materials.parentElement
-        while (parent && parent !== document.body) {
-          if (parent.contains(difficulty)) {
-            const branches = Array.from(parent.children) as HTMLElement[]
-            const left = branches.find((child) => child.contains(materials))
-            const right = branches.find((child) => child.contains(difficulty))
-            if (left && right && left !== right) {
-              const a = left.getBoundingClientRect()
-              const b = right.getBoundingClientRect()
-              if (a.width >= 250 && b.width >= 200 && a.right <= b.left + 12) {
-                leftColumn = left
-                break
-              }
-            }
-          }
-          parent = parent.parentElement
-        }
-      }
-      if (leftColumn) {
-        // In the existing two-column layout, the left side is shorter. Put both
-        // compact duration controls there instead of below the whole form.
-        node.classList.add('stage9e-in-left')
-        node.style.maxWidth = '100%'
-        node.style.marginLeft = '0'
-        node.style.marginRight = '0'
-        if (node.parentElement !== leftColumn || node !== leftColumn.lastElementChild) {
-          leftColumn.appendChild(node)
-        }
-      } else {
-        // Unknown/custom configuration DOM: keep the last known-good placement.
-        node.classList.remove('stage9e-in-left')
-        const hostWidth = host.getBoundingClientRect().width
-        const mainWidth = main?.getBoundingClientRect().width || hostWidth
-        const createCandidate = Array.from((form ?? main ?? document).querySelectorAll<HTMLButtonElement>('button'))
-          .find((button) => /开始答辩|创建答辩|开始面试|创建面试/.test(button.textContent || ''))
-        let matchingWidth: number | null = null
-        if (createCandidate && main) {
-          let ancestor: HTMLElement | null = createCandidate.parentElement
-          while (ancestor && ancestor !== main) {
-            const width = ancestor.getBoundingClientRect().width
-            if (width >= 340 && width < mainWidth - 24) {
-              matchingWidth = matchingWidth === null ? width : Math.max(matchingWidth, width)
-            }
-            ancestor = ancestor.parentElement
-          }
-        }
-        if (form && form.getBoundingClientRect().width < mainWidth - 24) {
-          matchingWidth = form.getBoundingClientRect().width
-        }
-        node.style.maxWidth = matchingWidth !== null ? `${Math.floor(matchingWidth)}px` : '100%'
-        node.style.marginLeft = 'auto'
-        node.style.marginRight = 'auto'
-        const createButton = form && Array.from(form.querySelectorAll<HTMLButtonElement>('button'))
-          .find((button) => /开始答辩|创建答辩|开始面试|创建面试/.test(button.textContent || ''))
-        const actionRow = createButton?.parentElement
-        const anchor = actionRow && actionRow.parentElement === host ? actionRow : null
-        if (node.parentElement !== host || node.nextElementSibling !== anchor) {
-          if (anchor) host.insertBefore(node, anchor)
-          else if (node.parentElement !== host || node !== host.lastElementChild) host.appendChild(node)
-        }
-      }
-      if (node.isConnected) setSlot((current) => current === node ? current : node)
-    }
-    position()
-    const interval = window.setInterval(position, 750)
-    // This listener is alive on the configure screen when its create call navigates to #session/{id}.
-    // Only that direct transition commits a setting to a new session; existing sessions are untouched.
-    const bindNewSession = () => {
-      const nextSession = sessionFromHash()
-      const entered = parseMinutes(inputRef.current)
-      const totalEntered = parseMinutes(totalInputRef.current)
-      if (!nextSession || entered === null || totalEntered === null) return
-      try {
-        window.localStorage.setItem(sessionMinutesKey(nextSession), String(entered))
-        window.localStorage.setItem(sessionTotalMinutesKey(nextSession), String(totalEntered))
-      } catch { /* Private browsing can disable persistence; defaults still work. */ }
-    }
-    window.addEventListener('hashchange', bindNewSession)
-    return () => {
-      active = false
-      window.clearInterval(interval)
-      window.removeEventListener('hashchange', bindNewSession)
-      node.remove()
-      setSlot(null)
-    }
-  }, [isConfig])
-
-  function setMinutes(value: string) {
-    inputRef.current = value
-    setMinutesText(value)
-    const number = parseMinutes(value)
-    if (number !== null) {
-      try { window.localStorage.setItem(PREFERRED_MINUTES_KEY, String(number)) }
-      catch { /* allow the form to keep working */ }
-    }
-  }
-
-  function setTotalMinutes(value: string) {
-    totalInputRef.current = value
-    setTotalMinutesText(value)
-    const number = parseMinutes(value)
-    if (number !== null) {
-      try { window.localStorage.setItem(PREFERRED_TOTAL_MINUTES_KEY, String(number)) }
-      catch { /* allow form to remain usable */ }
-    }
-  }
-  function restoreInvalid(field: 'question' | 'total') {
-    const isQuestion = field === 'question'
-    if (isQuestion ? valid : totalValid) return
-    const key = isQuestion ? PREFERRED_MINUTES_KEY : PREFERRED_TOTAL_MINUTES_KEY
-    const fallback = isQuestion ? DEFAULT_MINUTES : 0
-    let last = fallback
-    try { last = parseMinutes(window.localStorage.getItem(key)) ?? fallback }
-    catch { /* keep default */ }
-    if (isQuestion) setMinutes(String(last))
-    else setTotalMinutes(String(last))
-  }
-
-  if (!isConfig || !slot) return null
-  return createPortal(<section className="stage9c-config" aria-label="答辩时间设置">
-    <div className="stage9d-duration-grid">
-      <div className="stage9d-duration-item">
-        <div className="stage9c-config-head">
-          <label htmlFor="stage9c-minutes">每题回答时间（分钟）</label>
-          <span>0 ～ 60</span>
-        </div>
-        <div className="stage9c-config-row">
-          <input id="stage9c-minutes" type="number" inputMode="numeric" min={0} max={MAX_MINUTES} step={1}
-            value={minutesText} onChange={(event) => setMinutes(event.target.value)}
-            onBlur={() => restoreInvalid('question')}
-            aria-invalid={!valid} aria-describedby="stage9d-question-help" />
-          <span className="stage9c-unit">分钟</span>
-          <span className="stage9c-config-hint">{noLimitSelected ? '不限时' : `每题 ${minutesText} 分钟`}</span>
-        </div>
-        <p className="stage9c-help" id="stage9d-question-help">0 表示不限制单题时间；默认 2 分钟。每道新题重新计时。</p>
-        {!valid && <p className="stage9c-error" role="alert">每题时间必须是 0～60 的整数。</p>}
-      </div>
-      <div className="stage9d-duration-item">
-        <div className="stage9c-config-head">
-          <label htmlFor="stage9d-total-minutes">本次答辩总时间（分钟）</label>
-          <span>0 ～ 60</span>
-        </div>
-        <div className="stage9c-config-row">
-          <input id="stage9d-total-minutes" type="number" inputMode="numeric" min={0} max={MAX_MINUTES} step={1}
-            value={totalMinutesText} onChange={(event) => setTotalMinutes(event.target.value)}
-            onBlur={() => restoreInvalid('total')}
-            aria-invalid={!totalValid} aria-describedby="stage9d-total-help" />
-          <span className="stage9c-unit">分钟</span>
-          <span className="stage9c-config-hint">{totalUnlimited ? '整场不限时' : `整场 ${totalMinutesText} 分钟`}</span>
-        </div>
-        <p className="stage9c-help" id="stage9d-total-help">0 表示不限制整场时间；默认 0。从首次显示题目开始持续计时，切换题目不重置。</p>
-        {!totalValid && <p className="stage9c-error" role="alert">总时间必须是 0～60 的整数。</p>}
-      </div>
-    </div>
-    <p className="stage9c-help stage9d-bottom-help">
-      0 表示不限时；每题换题重计时，整场时间持续计时。仅对新建答辩生效。
-    </p>
-  </section>, slot)
-}
-
-/**
- * Standalone add-on: leave InterviewSessionPage.tsx and its scoring logic untouched.
- * The current unanswered turn comes from the existing authenticated session API.
- */
+/** Microphone and timing UI; the interview page owns the only editable answer and its submission. */
 export default function DefenseVoiceTimer() {
   const [sessionId, setSessionId] = useState<string | null>(() => sessionFromHash())
   const [session, setSession] = useState<Session | null>(null)
@@ -286,10 +61,9 @@ export default function DefenseVoiceTimer() {
   const [totalRemaining, setTotalRemaining] = useState(0)
   const [totalContinued, setTotalContinued] = useState(false)
   const [finishing, setFinishing] = useState(false)
-  const [transcript, setTranscript] = useState('')
   const [recording, setRecording] = useState(false)
   const [transcribing, setTranscribing] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [skipping, setSkipping] = useState(false)
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
   const recorderRef = useRef<MediaRecorder | null>(null)
@@ -335,7 +109,7 @@ export default function DefenseVoiceTimer() {
         if (!response.ok) { if (mounted) setSession(null); return }
         const value = await response.json() as Session
         if (mounted) setSession(value)
-      } catch { /* offline hint is shown by existing Stage 5E health panel */ }
+      } catch { /* Keep the existing session until connectivity resumes. */ }
       finally { pending = false }
     }
     void poll()
@@ -381,7 +155,7 @@ export default function DefenseVoiceTimer() {
     mediaRef.current?.getTracks().forEach((track) => track.stop())
     abortRef.current?.abort()
     recorderRef.current = null; mediaRef.current = null; abortRef.current = null
-    setRecording(false); setTranscribing(false); setTranscript(''); setError(''); setNotice('')
+    setRecording(false); setTranscribing(false); setError(''); setNotice('')
     if (!turnKey) { setDeadline(null); return }
     if (unlimited) {
       setDeadline(null); setContinued(true); setRemaining(0)
@@ -440,7 +214,7 @@ export default function DefenseVoiceTimer() {
     abortRef.current?.abort()
   }, [])
 
-  async function transcribeAudio(data: Blob, recordingTurnKey: string) {
+  async function transcribeAudio(data: Blob, recordingTurnKey: string, recordingSessionId: string, recordingTurnId: string) {
     if (recordingTurnKey !== turnRef.current) return
     if (data.size > 18 * 1024 * 1024) { setError('录音太大，请分段录制。'); return }
     if (data.size < 128) { setError('录音内容为空，请重新录制。'); return }
@@ -457,7 +231,7 @@ export default function DefenseVoiceTimer() {
       const result = await response.json() as Transcription
       if (abort.signal.aborted || recordingTurnKey !== turnRef.current) return
       if (!result.text.trim()) { setError('没有识别到有效中文语音，请重录或输入文字。'); return }
-      setTranscript((old) => old.trim() ? `${old.trim()}\n${result.text}` : result.text)
+      announceTranscript({ sessionId: recordingSessionId, turnId: recordingTurnId, text: result.text })
       setNotice(`识别成功（约 ${Math.round(result.duration_seconds)} 秒）。请检查文字后再提交。`)
     } catch (cause) {
       if (!abort.signal.aborted) setError(`语音转写失败：${messageOf(cause)}`)
@@ -465,13 +239,15 @@ export default function DefenseVoiceTimer() {
   }
 
   async function startRecording() {
-    if (recording || transcribing || submitting || !turnKey) return
+    if (recording || transcribing || skipping || !turnKey || !sessionId || !pendingTurn) return
     setError(''); setNotice('')
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       setError('当前浏览器不支持录音。请使用最新版 Chrome/Edge 并通过 localhost 或 127.0.0.1 访问。')
       return
     }
     const key = turnKey
+    const recordingSessionId = sessionId
+    const recordingTurnId = String(pendingTurn.id)
     try {
       const media = await navigator.mediaDevices.getUserMedia({ audio: true })
       if (key !== turnRef.current) { media.getTracks().forEach((t) => t.stop()); return }
@@ -490,7 +266,7 @@ export default function DefenseVoiceTimer() {
         if (recorderRef.current === recorder) recorderRef.current = null
         setRecording(false)
         if (discardRef.current || key !== turnRef.current) return
-        void transcribeAudio(new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }), key)
+        void transcribeAudio(new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }), key, recordingSessionId, recordingTurnId)
       }
       recorder.start(1000)
       setRecording(true)
@@ -520,7 +296,7 @@ export default function DefenseVoiceTimer() {
   }
 
   async function finishSession() {
-    if (!sessionId || finishing || submitting) return
+    if (!sessionId || finishing || skipping) return
     setFinishing(true); setError(''); setNotice('正在结束本次答辩，请勿重复操作。')
     try {
       const live = await fetch(`/api/interviews/${encodeURIComponent(sessionId)}`, {
@@ -541,15 +317,13 @@ export default function DefenseVoiceTimer() {
   }
 
   async function submitAnswer(skip: boolean) {
-    if (!sessionId || !pendingTurn || !turnKey || submitting) return
-    const answer = skip ? SKIP_TEXT : transcript.trim()
-    if (!answer) { setError('请先录音识别或输入回答文字。'); return }
+    if (!skip || !sessionId || !pendingTurn || !turnKey || skipping) return
+    const answer = SKIP_TEXT
     if (totalActive && totalDeadline !== null && totalRemaining <= 0 && !totalContinued) {
       setError('本次答辩总时间已到，请先选择继续本场或结束本场。'); return
     }
-    if (!skip && !unlimited && remaining <= 0 && !continued) { setError('请先在本题超时提示中选择继续作答。'); return }
     const expected = turnKey
-    setSubmitting(true); setError(''); setNotice('正在提交给本地答辩后端，请勿重复提交。')
+    setSkipping(true); setError(''); setNotice('正在跳过本题，请勿重复操作。')
     try {
       // Check the server turn before sending to avoid stale submissions after original UI actions.
       const current = await fetch(`/api/interviews/${encodeURIComponent(sessionId)}`, { credentials: 'same-origin', cache: 'no-store' })
@@ -562,33 +336,46 @@ export default function DefenseVoiceTimer() {
         throw new Error('当前题目已经发生变化，未重复提交。请刷新查看最新题目。')
       }
       const id = Number(pendingTurn.id)
-      if (!Number.isInteger(id)) throw new Error('无法识别题目编号，请使用原回答框提交。')
-      if (skip) {
-        discardRef.current = true
-        if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
-        abortRef.current?.abort()
-        setTranscribing(false)
-      }
+      if (!Number.isInteger(id)) throw new Error('无法识别题目编号，请刷新后重试。')
+      discardRef.current = true
+      if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
+      abortRef.current?.abort()
+      setTranscribing(false)
       const response = await fetch(`/api/interviews/${encodeURIComponent(sessionId)}/answer`, {
         method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ turn_id: id, answer, user_feedback: 'none' }),
       })
       if (!response.ok) throw await apiError(response)
-      // The original interview page owns question/feedback rendering; reload from the server.
+      // A timeout skip is an explicit special action, not a second normal-answer submit path.
       window.location.reload()
     } catch (cause) {
       setError(`${messageOf(cause)} 若刚刚提交成功但网络中断，请刷新查看后端状态，不要重复点击。`)
-      setSubmitting(false)
+      setSkipping(false)
     }
   }
 
-  if (!turnKey || !pendingTurn || (!unlimited && deadline === null) || !slot) return <DefenseTimeSetting />
+  // Keep the single answer form aware of recording/transcribing and timeout decisions.
+  const activeTurnId = pendingTurn ? String(pendingTurn.id) : null
+  useEffect(() => {
+    if (!sessionId || !activeTurnId) return
+    announceVoiceStatus({ sessionId, turnId: activeTurnId, active: recording || transcribing || skipping })
+    return () => announceVoiceStatus({ sessionId, turnId: activeTurnId, active: false })
+  }, [sessionId, activeTurnId, recording, transcribing, skipping])
+  const timerBlocksAnswer = (!unlimited && deadline !== null && remaining <= 0 && !continued) ||
+    (totalActive && totalDeadline !== null && totalRemaining <= 0 && !totalContinued)
+  useEffect(() => {
+    if (!sessionId || !activeTurnId) return
+    announceTimerGate({ sessionId, turnId: activeTurnId, active: timerBlocksAnswer })
+    return () => announceTimerGate({ sessionId, turnId: activeTurnId, active: false })
+  }, [sessionId, activeTurnId, timerBlocksAnswer])
+
+  if (!turnKey || !pendingTurn || (!unlimited && deadline === null) || !slot) return null
   const wholeSessionTimeIsUp = totalActive && totalDeadline !== null && totalRemaining <= 0 && !totalContinued
-  const totalTimeoutPrompt = wholeSessionTimeIsUp && !submitting
-  const timeoutPrompt = !wholeSessionTimeIsUp && !unlimited && remaining <= 0 && !continued && !submitting && !finishing
+  const totalTimeoutPrompt = wholeSessionTimeIsUp && !skipping
+  const timeoutPrompt = !wholeSessionTimeIsUp && !unlimited && remaining <= 0 && !continued && !skipping && !finishing
   const late = !unlimited && remaining <= 0
   const totalLate = totalActive && totalRemaining <= 0
-  return <><DefenseTimeSetting />{createPortal(<>
+  return createPortal(<>
     <section className="stage9-panel" aria-label="语音答辩与每题倒计时">
       <div className="stage9-title">
         <h3>语音回答 · 第 {pendingTurn.question_number ?? '—'} 题</h3>
@@ -613,17 +400,10 @@ export default function DefenseVoiceTimer() {
       <div className="stage9-row">
         {recording
           ? <button type="button" className="stage9-button stop" onClick={stopRecording}>■ 停止录音并识别</button>
-          : <button type="button" className="stage9-button record" disabled={submitting || transcribing} onClick={() => void startRecording()}>🎙 开始语音回答</button>}
+          : <button type="button" className="stage9-button record" disabled={skipping || transcribing} onClick={() => void startRecording()}>🎙 开始语音回答</button>}
         {transcribing && <span className="stage9-status" role="status">正在本地转文字…</span>}
       </div>
-      <label htmlFor="stage9-draft" className="stage9-help">识别后可编辑；也可以直接在这里输入回答：</label>
-      <textarea id="stage9-draft" className="stage9-textarea" value={transcript} onChange={(event) => setTranscript(event.target.value)}
-        placeholder="点击麦克风回答，停止录音后这里会出现识别文字…" aria-label="可编辑的语音识别回答草稿" />
-      <div className="stage9-row">
-        <button type="button" className="stage9-button primary" disabled={submitting || finishing || transcribing || recording || !transcript.trim() || timeoutPrompt || totalTimeoutPrompt}
-          onClick={() => void submitAnswer(false)}>{submitting ? '提交中…' : '提交本题回答'}</button>
-        <span className="stage9-help">原有文字回答框仍可正常使用。</span>
-      </div>
+      <p className="stage9-help">语音识别结果会自动追加到下方唯一的回答框，检查并编辑后点击“提交回答”。无需单独提交语音草稿。</p>
       {!!notice && <p role="status" className="stage9-status">{notice}</p>}
       {!!error && <p role="alert" className="stage9-error">{error}</p>}
     </section>
@@ -653,5 +433,5 @@ export default function DefenseVoiceTimer() {
         </div>
       </div>
     </div>}
-  </>, slot)}</>
+  </>, slot)
 }

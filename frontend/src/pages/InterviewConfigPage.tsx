@@ -8,12 +8,18 @@ import {
   LoaderCircle,
   RefreshCw,
   ShieldAlert,
+  Clock3,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react'
 import { materialApi, resumeApi } from '../lib/api'
 import { createInterview } from '../lib/interviews'
 import { messageOf } from '../lib/resources'
 import type { MaterialInfo, ResumeInfo } from '../types/resources'
 import type { BackendInterviewConfig, InterviewerStyle } from '../types/interview'
+import { parseMinutes } from '../components/speech/defenseTime'
+import { DEFAULT_PREFERENCES, PRACTICE_PRESETS, assessTime, bindSessionTiming, loadPreferences, savePreferences } from '../lib/defenseConfiguration'
+import type { DefenseTiming } from '../lib/defenseConfiguration'
 
 const reviewerStyles: Array<{ value: InterviewerStyle; title: string; description: string }> = [
   { value: 'friendly', title: '和善型', description: '温和引导，但不会放松评价标准' },
@@ -29,111 +35,15 @@ const adaptation = [
 ]
 
 
-/**
- * Layout rules for the timer settings rendered by the voice/timer component.
- * Recording, countdown, and persistence are managed by that component.
- */
-const durationLayoutCSS = `
-[data-defense-config="true"] .stage9e-in-left.stage9c-config-slot {
-  box-sizing: border-box;
-  margin: 0 !important;
-  width: 100%;
-  max-width: 100%;
-}
-[data-defense-config="true"] .stage9e-in-left .stage9c-config {
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-  min-height: 0 !important;
-  padding: 15px 17px !important;
-  border: 1px solid rgba(255,255,255,.10) !important;
-  border-radius: 16px !important;
-  background: rgba(15,23,42,.75) !important;
-  color: #e8eefc;
-}
-[data-defense-config="true"] .stage9e-in-left .stage9c-config::before {
-  content: "5. 答辩时间设置";
-  display: block;
-  font-size: 16px;
-  font-weight: 650;
-  line-height: 1.4;
-  color: #f8fafc;
-}
-[data-defense-config="true"] .stage9e-in-left .stage9d-duration-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0,1fr)) !important;
-  gap: 12px !important;
-  flex: 1 1 auto;
-  align-items: stretch;
-}
-[data-defense-config="true"] .stage9e-in-left .stage9d-duration-item {
-  min-width: 0;
-  border-radius: 12px;
-  padding: 11px 12px !important;
-  background: #111e33 !important;
-  border: 1px solid #293952 !important;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-[data-defense-config="true"] .stage9e-in-left .stage9c-config-head {
-  font-size: 12px !important;
-  font-weight: 650;
-  gap: 6px;
-}
-[data-defense-config="true"] .stage9e-in-left .stage9c-config-head span {
-  font-size: 11px !important;
-  white-space: nowrap;
-}
-[data-defense-config="true"] .stage9e-in-left .stage9c-config-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px !important;
-  margin-top: 7px !important;
-}
-[data-defense-config="true"] .stage9e-in-left .stage9c-config input {
-  box-sizing: border-box;
-  width: 82px !important;
-  min-height: 38px;
-  padding: 6px 9px !important;
-  font-size: 16px !important;
-  border-radius: 9px;
-}
-[data-defense-config="true"] .stage9e-in-left .stage9c-config-hint {
-  font-size: 11px;
-}
-[data-defense-config="true"] .stage9e-in-left .stage9c-help:not(.stage9d-bottom-help) {
-  display: block !important;
-  font-size: 11px;
-  line-height: 1.5;
-  margin-top: 7px;
-  color: #9aacc9;
-}
-[data-defense-config="true"] .stage9e-in-left .stage9d-bottom-help {
-  display: none !important;
-}
-@media (max-width: 640px) {
-  [data-defense-config="true"] .stage9e-in-left .stage9d-duration-grid {
-    grid-template-columns: minmax(0,1fr) !important;
-  }
-}
-`
-
 export default function InterviewConfigPage() {
   const [resumes, setResumes] = useState<ResumeInfo[]>([])
   const [materials, setMaterials] = useState<MaterialInfo[]>([])
   const [resumeId, setResumeId] = useState('')
   const [materialIds, setMaterialIds] = useState<string[]>([])
-  const [config, setConfig] = useState<BackendInterviewConfig>({
-    reviewer_style: 'neutral',
-    initial_difficulty: 3,
-    adaptation_level: 2,
-    question_count: 8,
-    max_followups: 1,
-  })
+  const [config, setConfig] = useState<BackendInterviewConfig>(() => ({ ...DEFAULT_PREFERENCES.config }))
+  const [timing, setTiming] = useState<DefenseTiming>(() => ({ ...DEFAULT_PREFERENCES.timing }))
+  const [accountId, setAccountId] = useState<string | null>(null)
+  const [accountError, setAccountError] = useState('')
   const [loading, setLoading] = useState(true)
   const [fetchCounter, setFetchCounter] = useState(0)
   const [loadError, setLoadError] = useState('')
@@ -162,60 +72,68 @@ export default function InterviewConfigPage() {
     return () => { live = false; controller.abort() }
   }, [fetchCounter])
 
+  // Confirm the account with the server and re-load whenever auth state changes.
+  // This prevents stale preferences being shown if A signs out and B signs in on the same screen.
   useEffect(() => {
-    // Align the BOTTOM edges of the two lower cards on desktop.
-    // Because the materials section is taller than the reviewer-style section,
-    // forcing identical card heights would instead misalign their bottoms.
-    const main = document.querySelector<HTMLElement>('[data-defense-config="true"]')
-    const strength = main?.querySelector<HTMLElement>('[data-strength-card="true"]')
-    const materials = main?.querySelector<HTMLElement>('[data-materials-card="true"]')
-    if (!main || !strength) return
-
-    const alignBottomEdges = () => {
-      const timeCard = main.querySelector<HTMLElement>('.stage9e-in-left .stage9c-config')
-      if (!timeCard) return
-
-      // Remove stale heights before measuring the natural minimum height.
-      timeCard.style.removeProperty('min-height')
-      timeCard.style.height = 'auto'
-      if (!window.matchMedia('(min-width: 1024px)').matches) return
-
-      const naturalHeight = Math.ceil(timeCard.getBoundingClientRect().height)
-      const targetHeight = Math.round(
-        strength.getBoundingClientRect().bottom - timeCard.getBoundingClientRect().top,
-      )
-      // Never shrink the controls below their natural content size.
-      if (targetHeight >= naturalHeight) {
-        timeCard.style.height = `${targetHeight}px`
-      }
+    let controller: AbortController | null = null
+    let active = true
+    const resetAccount = () => {
+      controller?.abort()
+      setAccountId(null)
+      setConfig({ ...DEFAULT_PREFERENCES.config })
+      setTiming({ ...DEFAULT_PREFERENCES.timing })
+      setAccountError('')
     }
-
-    let frame: number | null = null
-    const scheduleAlign = () => {
-      if (frame !== null) return
-      frame = window.requestAnimationFrame(() => {
-        frame = null
-        alignBottomEdges()
-      })
+    const loadAccount = () => {
+      resetAccount()
+      const current = new AbortController()
+      controller = current
+      void fetch('/api/auth/profile', { credentials: 'same-origin', cache: 'no-store', signal: current.signal })
+        .then(async (response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`)
+          return await response.json() as { user_id?: string }
+        })
+        .then((profile) => {
+          if (current.signal.aborted || !active) return
+          if (!profile.user_id) throw new Error('账户标识缺失')
+          let saved = DEFAULT_PREFERENCES
+          try { saved = loadPreferences(profile.user_id, window.localStorage) }
+          catch { /* Browser may deny localStorage; use defaults. */ }
+          setConfig({ ...saved.config })
+          setTiming({ ...saved.timing })
+          setAccountId(profile.user_id)
+        })
+        .catch((error: unknown) => {
+          if (!current.signal.aborted && active) setAccountError(`无法确认当前账号：${messageOf(error)}。请重新登录或刷新页面。`)
+        })
     }
-
-    // The timer settings are mounted asynchronously through a portal.
-    const domObserver = new MutationObserver(scheduleAlign)
-    domObserver.observe(main, { childList: true, subtree: true })
-    const sizeObserver = typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(scheduleAlign)
-      : null
-    sizeObserver?.observe(strength)
-    if (materials) sizeObserver?.observe(materials)
-    window.addEventListener('resize', scheduleAlign)
-    scheduleAlign()
+    const authChanged = (event: Event) => {
+      const ready = (event as CustomEvent<{ ready: boolean }>).detail?.ready
+      if (ready) loadAccount()
+      else resetAccount()
+    }
+    window.addEventListener('interview-auth-change', authChanged)
+    loadAccount()
     return () => {
-      domObserver.disconnect()
-      sizeObserver?.disconnect()
-      window.removeEventListener('resize', scheduleAlign)
-      if (frame !== null) window.cancelAnimationFrame(frame)
+      active = false
+      controller?.abort()
+      window.removeEventListener('interview-auth-change', authChanged)
     }
   }, [])
+
+  useEffect(() => {
+    if (!accountId) return
+    try { savePreferences(accountId, { config, timing }, window.localStorage) }
+    catch { /* Browser denied storage access. */ }
+  }, [accountId, config, timing])
+
+  const timeAssessment = assessTime(config.question_count, timing.questionMinutes, timing.totalMinutes, config.max_followups)
+  const invalidTime = timeAssessment.kind === 'invalid'
+
+  function applyPreset(preset: typeof PRACTICE_PRESETS[number]) {
+    setConfig({ ...preset.config })
+    setTiming({ ...preset.timing })
+  }
 
   function toggleMaterial(id: string) {
     setMaterialIds((selected) => selected.includes(id)
@@ -224,7 +142,7 @@ export default function InterviewConfigPage() {
   }
 
   async function startInterview() {
-    if (!resumeId || loading || submitting || loadError) return
+    if (!resumeId || loading || submitting || loadError || !accountId || invalidTime) return
     setSubmitting(true)
     setCreateError('')
     try {
@@ -233,6 +151,10 @@ export default function InterviewConfigPage() {
         material_ids: materialIds,
         config,
       })
+      // Bind timers only after the API actually created a new session.
+      // Existing session deadlines and per-session settings are never touched.
+      try { bindSessionTiming(session.id, timing, window.localStorage) }
+      catch { /* Storage unavailable: countdown uses its documented defaults. */ }
       window.location.hash = `#session/${encodeURIComponent(session.id)}`
     } catch (error) {
       setCreateError(messageOf(error))
@@ -245,7 +167,6 @@ export default function InterviewConfigPage() {
 
   return (
     <main data-defense-config="true" className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100 sm:px-6">
-      <style>{durationLayoutCSS}</style>
       <div className="mx-auto max-w-5xl">
         <a href="#dashboard" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-cyan-200">
           <ChevronLeft className="size-4" /> 返回概览
@@ -259,6 +180,20 @@ export default function InterviewConfigPage() {
             </div>
           </div>
         </header>
+
+        <section aria-label="答辩配置预设" className="mb-6 rounded-2xl border border-white/10 bg-slate-900/75 p-5">
+          <h2 className="font-semibold">常用练习方案</h2>
+          <p className="mt-1 text-xs text-slate-400">可一键套用，也可以逐项调整；你的设置会在当前账号的本机浏览器中记住。</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {PRACTICE_PRESETS.map((preset) => (
+              <button key={preset.id} type="button" onClick={() => applyPreset(preset)}
+                className="rounded-xl border border-white/15 bg-slate-950/60 px-3 py-3 text-left hover:border-cyan-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-400">
+                <span className="block text-sm font-medium text-white">{preset.label}</span>
+                <span className="mt-1 block text-xs text-slate-400">{preset.description}</span>
+              </button>
+            ))}
+          </div>
+        </section>
 
         {loadError && (
           <div role="alert" className="mb-6 rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-100">
@@ -285,6 +220,19 @@ export default function InterviewConfigPage() {
                     </select>
                   </label>
                 )}
+              {resumes.length > 0 && !loading && (() => {
+                const selected = resumes.find((r) => r.id === resumeId)
+                if (!selected) return null
+                const { filled, total, missing_sections } = selected.quality
+                const crucialMissing = missing_sections.filter((key) => ['projects', 'experience', 'skills'].includes(key))
+                return (
+                  <div className={`mt-3 rounded-lg border p-3 text-sm ${filled <= 2 || crucialMissing.length > 0 ? 'border-amber-400/30 bg-amber-400/5 text-amber-100' : 'border-emerald-400/20 bg-emerald-400/5 text-slate-200'}`}>
+                    <p>{filled <= 2 || crucialMissing.length > 0 ? '⚠️' : '✓'} 已填写 {filled}/{total} 个章节（完整度参考）</p>
+                    {crucialMissing.length > 0 && <p className="mt-1">项目经历、实习经历或技能信息存在缺项，可能影响出题针对性。</p>}
+                    <a className="mt-2 inline-block font-medium text-cyan-300 underline" href={`#resumes/${encodeURIComponent(selected.id)}`}>去补全这份简历</a>
+                  </div>
+                )
+              })()}
             </section>
 
             <section data-materials-card="true" className="rounded-2xl border border-white/10 bg-slate-900/75 p-5">
@@ -309,6 +257,36 @@ export default function InterviewConfigPage() {
                     </div>
                   )}
               <p className="mt-3 text-xs text-slate-500">已选择 {materialIds.length} / 10</p>
+            </section>
+
+            <section aria-label="答辩时间设置" className="rounded-2xl border border-white/10 bg-slate-900/75 p-5">
+              <h2 className="flex items-center gap-2 font-semibold"><Clock3 className="size-5 text-cyan-300" /> 5. 答辩时间设置</h2>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm text-slate-300">每题回答时间（分钟）
+                  <input type="number" min={0} max={60} step={1} inputMode="numeric" value={timing.questionMinutes}
+                    onChange={(event) => setTiming((old) => ({ ...old, questionMinutes: event.target.value }))}
+                    aria-invalid={parseMinutes(timing.questionMinutes) === null}
+                    className={`mt-2 ${control}`} />
+                  <span className="mt-1 block text-xs text-slate-500">0 表示单题不限时；每道新题重新计时。</span>
+                </label>
+                <label className="block text-sm text-slate-300">整场总时间（分钟）
+                  <input type="number" min={0} max={60} step={1} inputMode="numeric" value={timing.totalMinutes}
+                    onChange={(event) => setTiming((old) => ({ ...old, totalMinutes: event.target.value }))}
+                    aria-invalid={parseMinutes(timing.totalMinutes) === null}
+                    className={`mt-2 ${control}`} />
+                  <span className="mt-1 block text-xs text-slate-500">0 表示整场不限时；切题不重置。</span>
+                </label>
+              </div>
+              <div role="status" className={`mt-4 flex items-start gap-2 rounded-lg border p-3 text-sm ${
+                invalidTime || timeAssessment.kind === 'short' ? 'border-rose-400/30 bg-rose-400/5 text-rose-200' :
+                timeAssessment.kind === 'tight' ? 'border-amber-400/30 bg-amber-400/5 text-amber-200' :
+                'border-cyan-400/20 bg-cyan-400/5 text-slate-200'
+              }`}>
+                {invalidTime || timeAssessment.kind === 'short' || timeAssessment.kind === 'tight'
+                  ? <AlertTriangle className="mt-0.5 size-4 shrink-0" /> : <CheckCircle2 className="mt-0.5 size-4 shrink-0" />}
+                <span>{timeAssessment.message}</span>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">这是按单题上限估算的配置提醒，不是实际答辩时长；追问与模型响应可能额外占用时间。</p>
             </section>
           </div>
 
@@ -365,6 +343,7 @@ export default function InterviewConfigPage() {
             <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-300" />
             <span>开始后会向当前配置的模型服务发送所选简历及必要的答辩上下文；使用云端模型可能产生费用，本地 Ollama 则由你的电脑运行。模型不可用时可能返回错误，不会生成虚假会话。</span>
           </div>
+          {accountError && <p role="alert" className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{accountError}</p>}
           {createError && <p role="alert" className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{createError}</p>}
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
             <button type="button" onClick={() => setFetchCounter((n) => n + 1)} disabled={loading || submitting}
@@ -372,7 +351,7 @@ export default function InterviewConfigPage() {
               <RefreshCw className="size-4" /> 刷新简历与资料
             </button>
             <button type="button" onClick={startInterview}
-              disabled={loading || submitting || !!loadError || !resumeId || !Number.isInteger(config.question_count) || config.question_count < 3 || config.question_count > 30}
+              disabled={loading || submitting || !!loadError || !accountId || invalidTime || !resumeId || !Number.isInteger(config.question_count) || config.question_count < 3 || config.question_count > 30}
               className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40">
               {submitting ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
               {submitting ? '正在生成第一题…' : '开始答辩'}

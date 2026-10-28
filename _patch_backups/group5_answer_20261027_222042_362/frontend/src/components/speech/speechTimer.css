@@ -1,0 +1,47 @@
+/* Stage 9 -- navy/cyan, consistent with the existing dashboard. */
+.stage9-portal-slot { width: 100%; display: block; margin: 0 0 22px; }
+.stage9-panel { box-sizing: border-box; width: 100%; max-width: 100%; padding: 17px 20px;
+ background: #0e172b; border: 1px solid #293952; border-radius: 16px; color: #e8eefc;
+ box-shadow: 0 8px 30px #0002; font-family: inherit; }
+.stage9-title { display: flex; gap: 12px; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 9px; }
+.stage9-title h3 { color: #e8eefc; font-size: 16px; margin: 0; font-weight: 750; }
+.stage9-timer { font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 800; letter-spacing: 1px; color: #67e8f9; }
+.stage9-timer.warning { color: #fbbf24; } .stage9-timer.expired { color: #fca5a5; }
+.stage9-progress { height: 5px; border-radius: 99px; background: #25314a; overflow: hidden; }
+.stage9-progress > span { display:block; height:100%; background:#22d3ee; transition: width .4s linear; }
+.stage9-help { font-size: 12px; color: #9aacc9; line-height: 1.6; margin: 9px 0; }
+.stage9-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0 0; }
+.stage9-button { color: #e8eefc; background: #172b47; border: 1px solid #38506e; padding: 8px 13px;
+ border-radius: 10px; cursor:pointer; font-weight: 600; font-size: 13px; }
+.stage9-button:hover:not(:disabled) { background: #1c3b5d; border-color: #5b7b9e; }
+.stage9-button:disabled { opacity: .5; cursor: wait; }
+.stage9-button.primary { color: #fff; background:#1d4ed8; border-color:#2563eb; }
+.stage9-button.primary:hover:not(:disabled) { background:#2563eb; }
+.stage9-button.record { background:#064e3b; border-color:#0d9488; color:#a7f3d0; }
+.stage9-button.stop { background:#7f1d1d75; border-color:#f87171; color:#fecaca; }
+.stage9-status { font-size: 12px; margin: 7px 0; color: #93c5fd; line-height: 1.7; }
+.stage9-error { color:#fecaca; font-size:12px; line-height:1.7; white-space:pre-wrap; }
+.stage9-textarea { box-sizing:border-box; width:100%; min-height: 85px; resize:vertical; padding:12px;
+ margin-top: 10px; border:1px solid #334560; border-radius:10px; color:#eff6ff; background:#111e33;
+ font: inherit; font-size: 14px; line-height: 1.7; outline:none; }
+.stage9-textarea:focus { border-color:#22d3ee; box-shadow:0 0 0 3px #06b6d428; }
+.stage9-modal-bg { position:fixed; inset:0; z-index:2147483520; display:grid; place-items:center;
+ background:#020617d9; padding: 16px; }
+.stage9-modal { width:min(100%,440px); padding:25px; background:#0e172b; border:1px solid #475569;
+ border-radius:18px; color:#e8eefc; box-shadow:0 20px 70px #000c; }
+.stage9-modal h3 { font-size:19px; margin:0 0 12px; }
+.stage9-modal p { color:#a9bad3; font-size:13px; line-height:1.8; }
+@media(max-width:650px) { .stage9-panel { padding:13px; } .stage9-timer {font-size:22px;} }
+
+/* Whole-session countdown display. Configuration fields live in InterviewConfigPage. */
+.stage9d-timer-pair { display:flex; gap:17px; align-items:center; flex-wrap:wrap; }
+.stage9d-timer-block { min-width:110px; display:flex; flex-direction:column; align-items:flex-end; }
+.stage9d-timer-block + .stage9d-timer-block { border-left:1px solid #293952; padding-left:17px; }
+.stage9d-timer-label { font-size:11px; color:#9aacc9; }
+@media(max-width:680px) {
+  .stage9d-timer-pair { gap:12px; }
+  .stage9d-timer-block + .stage9d-timer-block { padding-left:12px; }
+  .stage9d-timer-block { min-width:86px; }
+  .stage9d-timer-block .stage9-timer { font-size:21px; }
+}
+

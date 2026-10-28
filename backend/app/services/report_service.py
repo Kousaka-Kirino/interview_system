@@ -9,6 +9,8 @@ from app.models.session import InterviewSession, InterviewTurn
 from app.schemas.report import (
     AIAnalysis,
     HistoryItem,
+    CompletedScoreHistory,
+    CompletedScorePoint,
     HistoryPage,
     InterviewReportView,
     OverallStatistics,
@@ -151,6 +153,43 @@ def get_statistics(
             else None
         ),
     )
+
+def get_completed_score_history(db: Session, limit: int = 20) -> CompletedScoreHistory:
+    """Last N scored completed sessions. SQLite user isolation comes from get_db().
+
+    Skip active/zero-scored sessions. Unanswered turns and scores of None
+    never contribute; an actual score of zero *does* contribute.
+    """
+    scored_count = func.count(InterviewTurn.id).label("scored_count")
+    average = func.avg(InterviewTurn.score).label("average")
+    rows = db.execute(
+        select(
+            InterviewSession.id,
+            InterviewSession.created_at,
+            average,
+            scored_count,
+        )
+        .join(InterviewTurn, InterviewTurn.session_id == InterviewSession.id)
+        .where(
+            InterviewSession.status == "completed",
+            InterviewTurn.answer.is_not(None),
+            InterviewTurn.score.is_not(None),
+        )
+        .group_by(InterviewSession.id, InterviewSession.created_at)
+        .order_by(InterviewSession.created_at.desc(), InterviewSession.id.desc())
+        .limit(limit)
+    ).all()
+    # API returns chronological order; last item is the most recent session.
+    return CompletedScoreHistory(points=[
+        CompletedScorePoint(
+            session_id=row.id,
+            created_at=row.created_at,
+            average_score=round(float(row.average), 2),
+            scored_answers=int(row.scored_count),
+        )
+        for row in reversed(rows)
+    ])
+
 
 def build_report(
     db: Session,

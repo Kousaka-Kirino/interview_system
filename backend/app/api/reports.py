@@ -22,6 +22,7 @@ from app.models.session import InterviewSession
 
 from app.schemas.report import (
     HistoryPage,
+    CompletedScoreHistory,
     InterviewReportView,
     OverallStatistics,
 )
@@ -37,6 +38,7 @@ from app.services.report_ai import create_ai_analysis
 from app.services.report_service import (
     build_report,
     get_history,
+    get_completed_score_history,
     get_statistics,
 )
 
@@ -111,6 +113,15 @@ def statistics(
 ) -> OverallStatistics:
 
     return get_statistics(db)
+
+@router.get(
+    "/score-history",
+    response_model=CompletedScoreHistory,
+)
+def score_history(db: Session = Depends(get_db)) -> CompletedScoreHistory:
+    """Return recent completed scored sessions, without invoking an LLM."""
+    return get_completed_score_history(db)
+
 
 @router.get(
     "/{session_id}/report",
