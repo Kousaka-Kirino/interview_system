@@ -9,6 +9,8 @@ import {
   RefreshCw,
   ShieldAlert,
   Clock3,
+  BriefcaseBusiness,
+  Presentation,
   AlertTriangle,
   CheckCircle2,
 } from 'lucide-react'
@@ -16,12 +18,13 @@ import { materialApi, resumeApi } from '../lib/api'
 import { createInterview, getInterview } from '../lib/interviews'
 import { messageOf } from '../lib/resources'
 import type { MaterialInfo, ResumeInfo } from '../types/resources'
-import type { BackendInterviewConfig, InterviewerStyle } from '../types/interview'
+import type { BackendInterviewConfig, InterviewerStyle, PracticeMode } from '../types/interview'
 import { parseMinutes } from '../components/speech/defenseTime'
 import { DEFAULT_PREFERENCES, PRACTICE_PRESETS, assessTime, bindSessionTiming, loadPreferences, savePreferences } from '../lib/defenseConfiguration'
 import type { DefenseTiming } from '../lib/defenseConfiguration'
 import { repeatDraft, repeatTiming } from '../lib/retryPractice'
 import type { RepeatDraft } from '../lib/retryPractice'
+import { canStartPractice, loadPracticeMode, savePracticeMode } from '../lib/practiceMode'
 
 const reviewerStyles: Array<{ value: InterviewerStyle; title: string; description: string }> = [
   { value: 'friendly', title: '和善型', description: '温和引导，但不会放松评价标准' },
@@ -37,10 +40,11 @@ const adaptation = [
 ]
 
 
-export default function InterviewConfigPage({ retrySessionId }: { retrySessionId?: string }) {
+export default function InterviewConfigPage({ retrySessionId, focusMode = false }: { retrySessionId?: string; focusMode?: boolean }) {
   const [resumes, setResumes] = useState<ResumeInfo[]>([])
   const [materials, setMaterials] = useState<MaterialInfo[]>([])
   const [resumeId, setResumeId] = useState('')
+  const [mode, setMode] = useState<PracticeMode>('interview')
   const [materialIds, setMaterialIds] = useState<string[]>([])
   const [config, setConfig] = useState<BackendInterviewConfig>(() => ({ ...DEFAULT_PREFERENCES.config }))
   const [timing, setTiming] = useState<DefenseTiming>(() => ({ ...DEFAULT_PREFERENCES.timing }))
@@ -72,6 +76,7 @@ export default function InterviewConfigPage({ retrySessionId }: { retrySessionId
         if (retrySessionId) {
           if (!previous) throw new Error('无法读取原答辩会话。')
           const draft = repeatDraft(previous, nextResumes, nextMaterials)
+          setMode(draft.mode)
           setResumeId(draft.resumeId)
           setMaterialIds(draft.materialIds)
           setRepeatSource(draft)
@@ -104,6 +109,7 @@ export default function InterviewConfigPage({ retrySessionId }: { retrySessionId
       setRepeatTimingNotice('')
       setResumeId('')
       setMaterialIds([])
+      setMode('interview')
       setConfig({ ...DEFAULT_PREFERENCES.config })
       setTiming({ ...DEFAULT_PREFERENCES.timing })
       setAccountError('')
@@ -125,6 +131,10 @@ export default function InterviewConfigPage({ retrySessionId }: { retrySessionId
           catch { /* Browser may deny localStorage; use defaults. */ }
           setConfig({ ...saved.config })
           setTiming({ ...saved.timing })
+          if (!retrySessionId) {
+            try { setMode(loadPracticeMode(profile.user_id, window.localStorage)) }
+            catch { setMode('interview') }
+          }
           setAccountId(profile.user_id)
         })
         .catch((error: unknown) => {
@@ -151,6 +161,7 @@ export default function InterviewConfigPage({ retrySessionId }: { retrySessionId
   // Source answers/scores/deadlines are never copied; users must confirm creation.
   useEffect(() => {
     if (!retrySessionId || !accountId || !repeatSource) return
+    setMode(repeatSource.mode)
     setConfig({ ...repeatSource.config })
     let previousTime: DefenseTiming | null = null
     try { previousTime = repeatTiming(retrySessionId, window.localStorage) }
@@ -170,6 +181,12 @@ export default function InterviewConfigPage({ retrySessionId }: { retrySessionId
     catch { /* Browser denied storage access. */ }
   }, [accountId, config, timing, retrySessionId, repeatAppliedAccount])
 
+  useEffect(() => {
+    if (!accountId || retrySessionId) return
+    try { savePracticeMode(accountId, mode, window.localStorage) }
+    catch { /* browser preferences may be unavailable */ }
+  }, [accountId, mode, retrySessionId])
+
   const timeAssessment = assessTime(config.question_count, timing.questionMinutes, timing.totalMinutes, config.max_followups)
   const invalidTime = timeAssessment.kind === 'invalid'
 
@@ -185,15 +202,17 @@ export default function InterviewConfigPage({ retrySessionId }: { retrySessionId
   }
 
   async function startInterview() {
-    if (!resumeId || loading || submitting || loadError || !accountId || invalidTime ||
+    if (!canStartPractice(mode, resumeId, materialIds) || loading || submitting || loadError || !accountId || invalidTime ||
         (retrySessionId && (!repeatSource || repeatAppliedAccount !== accountId))) return
     setSubmitting(true)
     setCreateError('')
     try {
       const session = await createInterview({
-        resume_id: resumeId,
+        mode,
+        ...(mode === 'interview' ? { resume_id: resumeId } : {}),
         material_ids: materialIds,
         config,
+        ...(focusMode && retrySessionId ? { focus_session_id: retrySessionId } : {}),
       })
       // Bind timers only after the API actually created a new session.
       // Existing session deadlines and per-session settings are never touched.
@@ -219,11 +238,31 @@ export default function InterviewConfigPage({ retrySessionId }: { retrySessionId
           <div className="flex items-center gap-3">
             <span className="rounded-2xl bg-cyan-500/10 p-3 text-cyan-300"><BookOpenCheck className="size-7" /></span>
             <div>
-              <h1 className="text-2xl font-bold">创建模拟答辩</h1>
-              <p className="mt-1 text-sm text-slate-400">选择简历、补充材料及答辩设置，准备开始模拟练习。</p>
+              <h1 className="text-2xl font-bold">开始模拟练习</h1>
+              <p className="mt-1 text-sm text-slate-400">面试练习以简历为主，项目答辩以已建立索引的材料为主。</p>
             </div>
           </div>
         </header>
+
+        <section aria-label="练习模式" className="mb-6 rounded-2xl border border-white/10 bg-slate-900/75 p-5" data-practice-modes="true">
+          <h2 className="mb-3 font-semibold">选择练习模式</h2>
+          <div className="grid gap-3 sm:grid-cols-2" role="group" aria-label="面试与项目答辩模式">
+            <button type="button" aria-pressed={mode === 'interview'} onClick={() => setMode('interview')}
+              disabled={!!retrySessionId}
+              className={`rounded-xl border p-4 text-left focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-70 ${mode === 'interview' ? 'border-cyan-400 bg-cyan-400/10' : 'border-white/15 hover:border-cyan-400/50'}`}>
+              <span className="flex items-center gap-2 font-semibold"><BriefcaseBusiness className="size-5" /> 💼 面试模式</span>
+              <span className="mt-2 block text-xs text-slate-300">必选简历，可补充项目材料。主要考察经历、技术与表达。</span>
+            </button>
+            <button type="button" aria-pressed={mode === 'defense'} onClick={() => setMode('defense')}
+              disabled={!!retrySessionId}
+              className={`rounded-xl border p-4 text-left focus-visible:outline-2 focus-visible:outline-cyan-300 disabled:cursor-not-allowed disabled:opacity-70 ${mode === 'defense' ? 'border-cyan-400 bg-cyan-400/10' : 'border-white/15 hover:border-cyan-400/50'}`}>
+              <span className="flex items-center gap-2 font-semibold"><Presentation className="size-5" /> 🛡️ 答辩模式</span>
+              <span className="mt-2 block text-xs text-slate-300">必选至少一份已索引的 PPT / 论文 / 项目资料；不需要简历。</span>
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-slate-400">项目答辩可在会话中翻看本地 PPT，并进行逐页文字体检与自我陈述。AI 暂不能识别图片、图表中的视觉细节；无本地演示转换器时会显示文字版。</p>
+          {retrySessionId && <p className="mt-2 text-xs text-amber-200">沿用上一场配置期间，模式已锁定；取消沿用后可重新选择。</p>}
+        </section>
 
         <section aria-label="答辩配置预设" className="mb-6 rounded-2xl border border-white/10 bg-slate-900/75 p-5">
           <h2 className="font-semibold">常用练习方案</h2>
@@ -242,12 +281,12 @@ export default function InterviewConfigPage({ retrySessionId }: { retrySessionId
 
         {retrySessionId && (
           <section aria-label="沿用上次答辩配置" className="mb-6 rounded-2xl border border-cyan-400/30 bg-cyan-400/5 p-5">
-            <h2 className="font-semibold text-cyan-200">沿用上一场资料，再练一次</h2>
-            <p className="mt-2 text-sm text-slate-300">只恢复原场次仍存在的简历、资料和评委/题量配置，不复制回答、评分或复盘；这一步不会调用 AI。</p>
+            <h2 className="font-semibold text-cyan-200">{focusMode ? '针对上场薄弱点专项再练' : '沿用上一场资料，再练一次'}</h2>
+            <p className="mt-2 text-sm text-slate-300">{focusMode ? '开始新答辩时，后端将检查原场次已缓存的 AI 薄弱点，并用于指导新问题；如果没有有效薄弱点则阻止专项模式，不会额外调用 AI 复盘。' : '只恢复原场次仍存在的简历、资料和评委/题量配置，不复制回答、评分或复盘；这一步不会调用 AI。'}</p>
             {loading && <p role="status" className="mt-2 text-sm text-slate-400">正在检查原场次和资料…</p>}
             {!loading && repeatSource && repeatAppliedAccount === accountId && (
               <div className="mt-2 text-sm text-slate-200">
-                <p>已选择原简历和 {repeatSource.materialIds.length} 份仍可用的材料，请核对后再开始新答辩。</p>
+                <p>{mode === 'defense' ? '已恢复原场次的项目材料，共' : '已选择原简历及'} {repeatSource.materialIds.length} 份仍可用的材料，请核对后再开始练习。</p>
                 {repeatSource.missingMaterialCount > 0 && <p className="mt-1 text-amber-200">原场次有 {repeatSource.missingMaterialCount} 份资料已不可用，未自动替换，请手动检查。</p>}
                 <p className="mt-1 text-slate-400">{repeatTimingNotice}</p>
               </div>
@@ -265,9 +304,9 @@ export default function InterviewConfigPage({ retrySessionId }: { retrySessionId
 
         <div className="grid gap-6 lg:grid-cols-5">
           <div className="space-y-6 lg:col-span-3">
-            <section className="rounded-2xl border border-white/10 bg-slate-900/75 p-5">
-              <h2 className="flex items-center gap-2 font-semibold"><FileText className="size-5 text-cyan-300" /> 1. 答辩简历</h2>
-              <p className="my-3 text-sm text-slate-400">答辩问题将结合所选简历。必须选择一份。</p>
+            {mode === 'interview' && <section className="rounded-2xl border border-white/10 bg-slate-900/75 p-5">
+              <h2 className="flex items-center gap-2 font-semibold"><FileText className="size-5 text-cyan-300" /> 1. 面试简历</h2>
+              <p className="my-3 text-sm text-slate-400">面试模式必须选择一份简历，用于个人经历、技术与项目提问。</p>
               {loading ? <p className="text-sm text-slate-400">加载中…</p>
                 : resumes.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-white/20 p-5 text-sm text-slate-300">
@@ -294,11 +333,13 @@ export default function InterviewConfigPage({ retrySessionId }: { retrySessionId
                   </div>
                 )
               })()}
-            </section>
+            </section>}
 
             <section data-materials-card="true" className="rounded-2xl border border-white/10 bg-slate-900/75 p-5">
-              <h2 className="flex items-center gap-2 font-semibold"><Layers className="size-5 text-cyan-300" /> 2. 补充资料（可选）</h2>
-              <p className="my-3 text-sm text-slate-400">选中后会在答辩时进行 RAG 检索；最多 10 份。</p>
+              <h2 className="flex items-center gap-2 font-semibold"><Layers className="size-5 text-cyan-300" /> {mode === 'defense' ? '1. 答辩项目材料（必选）' : '2. 补充资料（可选）'}</h2>
+              <p className="my-3 text-sm text-slate-400">{mode === 'defense'
+                ? '请选择至少一份已成功建立索引的 PPT 文字版、项目报告或论文（最多 10 份）。AI 将围绕这些材料提问。'
+                : '选中后会在面试时进行 RAG 检索；最多 10 份。'}</p>
               {loading ? <p className="text-sm text-slate-400">加载中…</p>
                 : materials.length === 0 ? <p className="text-sm text-slate-400">暂无资料，可在 <a href="#materials" className="text-cyan-300 underline">我的材料</a> 上传。</p>
                   : (
@@ -402,7 +443,7 @@ export default function InterviewConfigPage({ retrySessionId }: { retrySessionId
         <div className="mt-6 rounded-2xl border border-white/10 bg-slate-900/75 p-5">
           <div className="flex items-start gap-2 text-sm text-slate-400">
             <ShieldAlert className="mt-0.5 size-4 shrink-0 text-amber-300" />
-            <span>开始后会向当前配置的模型服务发送所选简历及必要的答辩上下文；使用云端模型可能产生费用，本地 Ollama 则由你的电脑运行。模型不可用时可能返回错误，不会生成虚假会话。</span>
+            <span>开始后会向当前配置的模型服务发送{mode === 'defense' ? '所选项目资料片段' : '所选简历与必要的补充资料'}；使用云端模型可能产生费用，本地 Ollama 在本机运行。当前不支持直接分析 PPT 图片和图表。</span>
           </div>
           {accountError && <p role="alert" className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{accountError}</p>}
           {createError && <p role="alert" className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">{createError}</p>}
@@ -412,10 +453,10 @@ export default function InterviewConfigPage({ retrySessionId }: { retrySessionId
               <RefreshCw className="size-4" /> 刷新简历与资料
             </button>
             <button type="button" onClick={startInterview}
-              disabled={loading || submitting || !!loadError || !accountId || invalidTime || !resumeId || (retrySessionId ? !repeatSource || repeatAppliedAccount !== accountId : false) || !Number.isInteger(config.question_count) || config.question_count < 3 || config.question_count > 30}
+              disabled={loading || submitting || !!loadError || !accountId || invalidTime || !canStartPractice(mode, resumeId, materialIds) || (retrySessionId ? !repeatSource || repeatAppliedAccount !== accountId : false) || !Number.isInteger(config.question_count) || config.question_count < 3 || config.question_count > 30}
               className="inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-40">
               {submitting ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
-              {submitting ? '正在生成第一题…' : '开始答辩'}
+              {submitting ? '正在生成第一题…' : (mode === 'defense' ? '开始项目答辩' : '开始模拟面试')}
             </button>
           </div>
         </div>

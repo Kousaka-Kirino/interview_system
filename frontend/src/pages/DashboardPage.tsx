@@ -93,6 +93,7 @@ function HistoryRow({ item }: { item: HistoryItem }) {
         <div className="mt-1 font-mono text-xs text-slate-500" title={item.id}>
           会话 {item.id.slice(0, 8)}…
         </div>
+        <span className="mt-1 inline-block text-xs text-cyan-300">{item.mode === 'defense' ? '项目答辩' : '模拟面试'}</span>
       </td>
       <td className="px-5 py-4 text-slate-300">
         {reviewerNames[item.reviewer_style] ?? item.reviewer_style}
@@ -224,7 +225,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-300">Interview Studio</p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">AI 模拟答辩工作台</h1>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">AI 智能面答模拟训练系统</h1>
               <p className="mt-1 text-sm text-slate-400">查看答辩记录、练习表现与复盘</p>
             </div>
           </div>
@@ -239,12 +240,7 @@ export default function DashboardPage() {
           </button>
         </header>
 
-        <div className="mt-7 flex flex-wrap items-center gap-2 text-sm text-slate-400">
-          <Server aria-hidden="true" className="size-4 text-cyan-400" />
-          <span>数据来源：本机 FastAPI / SQLite</span>
-          <span className="text-slate-600">·</span>
-          <span>无需 DeepSeek API Key</span>
-        </div>
+        
 
         {error && (
           <div role="alert" className="mt-7 flex flex-col gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5 sm:flex-row sm:items-center sm:justify-between">

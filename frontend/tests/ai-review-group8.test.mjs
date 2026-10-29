@@ -39,7 +39,7 @@ test('旧版本缓存没有新增字段仍能正常展示及导出', () => {
 })
 test('自动 AI 只在当前登录账号明确开启时触发', () => {
   const page = read('src/pages/InterviewReportPage.tsx')
-  assert.match(page, /interview_system:auto_ai_review:/)
+  assert.match(read('src/lib/autoReviewPreference.ts'), /interview_system:auto_ai_review:/)
   assert.match(page, /!autoEnabled/) // no default paid calls
   assert.match(page, /setAutoEnabled\(false\)/)
   assert.match(page, /autoAttempted\.current\.has\(sessionId\)/)

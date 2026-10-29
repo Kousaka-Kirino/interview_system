@@ -90,8 +90,7 @@ export default function AuthGate() {
     return () => window.clearInterval(timer)
   }, [mode])
 
-  // Stage 8D: insert the account controls directly after the "Start Defense" nav item.
-  // This intentionally avoids a fixed overlay, so wrapping cannot cover other links.
+  // Keep account controls in the navigation flow so they do not obscure other links.
   useEffect(() => {
     if (mode !== 'ready') {
       setNavSlot(null)

@@ -5,10 +5,8 @@ import { History } from 'lucide-react'
 import './dashboardDock.css'
 
 /*
- * Stage 7B - Use the existing dashboard history slot; keep React-owned history
- * nodes in place and merely toggle their visibility. React still owns its list.
- * This is a conservative layout bridge because the dashboard's original
- * source may vary across the Stage 5A-5E installations.
+ * The existing dashboard retains ownership of its history nodes.
+ * This layout bridge only manages visibility and the additional report area.
  */
 type Placement = {
   contentHost: HTMLDivElement

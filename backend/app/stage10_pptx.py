@@ -10,6 +10,11 @@ import logging
 import posixpath
 import re
 from pathlib import Path
+import os
+from uuid import UUID
+
+from app.stage11_local import account_settings
+from app.services.presentation_local import original_path
 import xml.etree.ElementTree as ET
 from zipfile import BadZipFile, ZipFile
 
@@ -168,8 +173,26 @@ async def import_pptx(request: Request, file: UploadFile = File(...)) -> Respons
                 headers=forwarded_headers,
                 files={"file": (converted_name, derivative, "application/vnd.openxmlformats-officedocument.wordprocessingml.document")},
             )
-        # Reuse the existing API's status and response. Do not change its
-        # returned original_filename: the stored document really is a DOCX.
+        # Store native PPTX only after successful authenticated DOCX indexing.
+        # This file stays strictly inside the current account's uploads directory.
+        if result.status_code == 201:
+            try:
+                material_id = str(UUID(result.json()['id']))
+                path = original_path(account_settings(require_owner_id(request)).uploads_dir, material_id)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                temporary = path.with_suffix('.pptx.uploading')
+                try:
+                    temporary.write_bytes(data)
+                    os.replace(temporary, path)
+                finally:
+                    temporary.unlink(missing_ok=True)
+            except Exception as exc:
+                logger.exception('原始 PPTX 保存失败，撤销刚创建的资料')
+                # The indexed DOCX must not be presented as a successful PPT upload.
+                async with httpx.AsyncClient(transport=transport, base_url='http://127.0.0.1:8000', timeout=None) as client:
+                    await client.delete(f'/api/materials/{result.json().get("id", "invalid")}', headers=forwarded_headers)
+                raise HTTPException(500, 'PPTX 原件未能保存在本机，上传已撤销') from exc
+        # Reuse existing DOCX material record and RAG index semantics.
         passthrough = {"content-type": result.headers.get("content-type", "application/json")}
         return Response(content=result.content, status_code=result.status_code, headers=passthrough)
     finally:

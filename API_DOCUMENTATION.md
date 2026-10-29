@@ -760,3 +760,50 @@ See `docs/STAGE11_LOCAL_REGISTRATION.md`.
 - **副作用**：无写入、无 LLM/Embedding 调用；不增加数据库迁移。路由必须在 `/{session_id}/report` 动态路由之前注册；同时加入 `stage8c2_guard.py` 的静态路由集合，避免被归属中间件当成会话 ID。
 
 具体界面规则、评级阈值、测试以及安装方式见 `docs/UI_POLISH_PHASE6.md`。
+
+## Stage 21：AI 复盘增强（兼容既有路由）
+
+`POST /api/interviews/{session_id}/report/ai?refresh=false`：需要已登录且会话属于当前账号，已完成并至少有一道已回答题目。已有 AI 缓存且未指定刷新时不会调用 DeepSeek；新生成与 `refresh=true` 会调用一次云端模型（或已配置的本地 Ollama）。
+
+`InterviewReportView.ai_analysis` 新增可选数组 `example_answers`（每项 `turn_id`, `answer`, `explanation`）与 `weak_points`（每项 `turn_id`, `title`, `reason`, `dimension`），旧缓存会补缺省空数组。AI 生成成功后弱点会根据真实题目加入现有 `/api/study/points` SQLite 数据库，并按用户/会话/题目锚点去重。失败不修改答辩成绩。自动调用是客户端的按账号可选行为，不改变服务器自动执行状态。详细见 `docs/UI_POLISH_PHASE8.md`。
+
+## Stage 22 / 第九组专项训练接口扩展
+
+`POST /api/interviews` 原请求体增加可选 `focus_session_id`（UUID 字符串，36字符）：
+
+```json
+{
+  "resume_id": "<已上传简历ID>",
+  "material_ids": [],
+  "config": {"question_count": 3},
+  "focus_session_id": "<当前账号已完成的原答辩ID>"
+}
+```
+
+- 不传 `focus_session_id` 时保持原行为；传入后，后端只信任该账号隔离数据库内已完成原场次的已缓存 AI 复盘，并按真实低分题目筛选最多三条弱点。
+- 没有完成复盘/有效薄弱点时返回 `409`；原场次不存在时返回 `404`；简历不一致返回 `422`，均不调用生成新题模型。
+- `GET /api/interviews/{id}` 和 `GET /api/interviews/{id}/report` 新增可空 `practice_focus`，展示来源会话与被采纳的薄弱点；不修改旧 SQLite 表结构。
+- `POST /api/interviews/{id}/report/ai?refresh=false` 仍是原有缓存优先语义。Stage 22 在默认单工作进程本地部署中增加同一账号/会话首次生成请求互斥。跨进程原子去重不是此次部署的保证。
+
+## Stage 23: 练习模式（第十组）
+
+- `POST /api/interviews` 增加可选 `mode`: `interview`（默认）或 `defense`。
+- `interview`：`resume_id` 必填、最多十份 `material_ids`；保留原有面试出题流程。
+- `defense`：`resume_id` 可省略；`material_ids` 至少一份且必须索引可用；以所选项目材料的文本片段为主要参考。未检索到有效片段时返回 HTTP 422，不调用出题模型。
+- `GET /api/interviews/{id}`、`GET /api/interviews/history` 和 `GET /api/interviews/{id}/report` 增加 `mode` 字段，旧记录默认 `interview`。
+- `defense` 创建的内部外键兼容 Resume 记录在列表/详情/编辑/删除接口中隐藏；不要把该会话的 `resume_id` 当作用户上传的简历。**不修改现有 SQLite 表结构**。
+- 当前仅检索可选中文字；不解析 PPT 截图、图表和视觉页码。详情参阅 `docs/UI_POLISH_PHASE10.md`。
+
+## Stage 24：本地 PPT 翻页与陈述分析（第十一组）
+
+请参阅 `docs/UI_POLISH_PHASE11.md` 的使用边界和缓存安全说明。
+
+| Method | Endpoint | 说明 |
+| --- | --- | --- |
+| GET | `/api/materials/{material_id}/slides` | 已上传 PPTX 页数、每页文字及原件/渲染信息，无模型调用 |
+| GET | `/api/materials/{material_id}/slides/{page}/image` | 本机渲染的图片 `image/png`；无法渲染时 422 |
+| POST | `/api/materials/{material_id}/slides/{page}/review` | 显式调用 AI，返回 `{question,risk,suggestion}`，已成功生成的页级分析从账号缓存读取 |
+| GET | `/api/interviews/{session_id}/opening` | 当前答辩自我陈述分析缓存 |
+| POST | `/api/interviews/{session_id}/opening` | `{"text":"30—10000 字的自我陈述"}`；首次回答前显式调用，返回 `{summary,strengths,improvements,followup_question}` |
+
+认证与账号归属由既有 Stage 8B/8C2 中间件负责。原始 PPTX 仅保存在当前登录账号的上传目录，资料仍在 Chroma 使用 DOCX 衍生文字索引。逐页分析**没有视觉模型能力**。

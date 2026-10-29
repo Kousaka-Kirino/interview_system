@@ -14,6 +14,7 @@ import {
 import { generateAIInterviewReport, getInterviewReport } from '../lib/interviews'
 import { messageOf } from '../lib/resources'
 import { exampleAnswers, reviewMarkdown, weakPoints } from '../lib/aiReview'
+import { autoReviewKey, autoReviewEnabled } from '../lib/autoReviewPreference'
 import type { InterviewReport, ReportTurn } from '../types/interview'
 
 function displayScore(value: number | null): string {
@@ -169,9 +170,9 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
       })
       .then((account) => {
         if (!live || !account.username) return
-        const key = `interview_system:auto_ai_review:${account.username}`
+        const key = autoReviewKey(account.username)
         setAutoAccountKey(key)
-        try { setAutoEnabled(window.localStorage.getItem(key) === '1') } catch { setAutoEnabled(false) }
+        setAutoEnabled(autoReviewEnabled(account.username, window.localStorage))
       }).catch(() => { if (live) setAutoAccountKey('') })
     return () => { live = false }
   }, [sessionId])
@@ -224,7 +225,8 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
   const aiImprovements = ai ? stringItems(ai.improvements) : []
   const aiNextSteps = ai ? stringItems(ai.next_steps) : []
   const samples = report ? exampleAnswers(report) : []
-  const weaknesses = report ? weakPoints(report) : []
+  const weaknesses = report ? weakPoints(report).filter((point) =>
+    report.turns.some((turn) => turn.turn_id === point.turn_id && turn.score !== null && turn.score < 80)) : []
   const recognizedAi = !!ai && (!!aiSummary(ai) || !!aiStrengths.length || !!aiImprovements.length || !!aiNextSteps.length)
 
   return (
@@ -236,10 +238,10 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
         <header className="mt-6 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="flex items-center gap-3 text-2xl font-bold">
-              <BookOpenCheck aria-hidden="true" className="size-7 text-cyan-300" /> 答辩复盘
+              <BookOpenCheck aria-hidden="true" className="size-7 text-cyan-300" /> {report?.mode === 'defense' ? '项目答辩复盘' : '模拟面试复盘'}
             </h1>
             <p className="mt-2 break-all font-mono text-xs text-slate-500">会话 {sessionId}</p>
-            <p className="mt-2 text-sm text-slate-400">离线规则复盘不调用模型；AI 复盘只有主动点击才会调用 DeepSeek。</p>
+            <p className="mt-2 text-sm text-slate-400">规则复盘不调用模型；AI 复盘仅在手动请求或此账号主动开启自动复盘时调用 DeepSeek。</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" disabled={loading || aiBusy} onClick={() => setRefreshCounter((n) => n + 1)}
@@ -315,10 +317,23 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
               <TextGroup title="下一步建议" items={report.suggestions} tone="text-cyan-300" />
             </div>}
 
+            {report.practice_focus && (
+              <section aria-label="专项练习记录" className="mt-7 rounded-2xl border border-amber-400/25 bg-amber-400/5 p-5">
+                <h2 className="font-semibold text-amber-200">本场专项训练重点</h2>
+                <p className="mt-2 text-sm text-slate-300">来源：上一场答辩 {report.practice_focus.source_session_id}。以下为出题参考重点，不等于逐维度的效果测量。</p>
+                <ul className="mt-2 space-y-1 text-sm text-amber-100">{report.practice_focus.weak_points.map((point, i) => <li key={i}>• {point.dimension}：{point.title}</li>)}</ul>
+                <p className="mt-2 text-xs text-slate-400">可使用本场平均分与上场平均分比较总体变化；不同题目的分数不具备严格的逐维度可比性。</p>
+              </section>
+            )}
             <section aria-label="再练一次" className="mt-7 rounded-2xl border border-cyan-400/25 bg-cyan-400/5 p-5 sm:p-6">
               <h2 className="text-lg font-semibold text-white">继续练习，巩固答辩表达</h2>
               <p className="mt-2 text-sm leading-6 text-slate-300">沿用本场仍然存在的简历、补充资料与答辩参数，先进入配置页核对，再决定是否开始新的一场。</p>
-              <p className="mt-1 text-xs text-slate-400">复用入口不会直接调用模型；若已启用下方 AI 自动复盘，将在打开完成的复盘页面后生成并保存薄弱点。</p>
+              <p className="mt-1 text-xs text-slate-400">沿用资料不会自动开始新答辩；专项再练仅在已有 AI 薄弱点时出现，开始后会指导下一场出题。</p>
+              {weaknesses.length > 0 && (
+                <a href={`#configure/focus/${encodeURIComponent(sessionId)}`} className="mt-4 mr-3 inline-flex items-center gap-2 rounded-xl border border-amber-400/50 bg-amber-400/10 px-4 py-2.5 text-sm font-semibold text-amber-100 hover:bg-amber-400/20">
+                  <RotateCcw aria-hidden="true" className="size-4" /> 针对 {Math.min(3, weaknesses.length)} 个薄弱点专项再练
+                </a>
+              )}
               <a href={`#configure/retry/${encodeURIComponent(sessionId)}`}
                 className="mt-4 inline-flex items-center gap-2 rounded-xl bg-cyan-400 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-cyan-300">
                 <RotateCcw aria-hidden="true" className="size-4" /> 沿用本场资料再练一次
@@ -339,7 +354,7 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
                 <div>
                   <h2 className="flex items-center gap-2 text-lg font-semibold"><Sparkles className="size-5 text-cyan-300" />可选 AI 深度复盘</h2>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                    AI 复盘可生成逐题示范答案并自动将有依据的薄弱点去重保存至本地复习库。调用云端模型时会上传答辩问答和评分；开启自动生成后，每场新复盘首次打开将自动调用一次。
+                    AI 复盘可生成逐题示范答案并自动将有依据的薄弱点去重保存至本地复习库。调用云端模型时会上传答辩问答和评分；开启自动生成后，每场完成后自动尝试生成；已有缓存不会再次计费。
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -359,10 +374,9 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
               <div className="mt-4 space-y-2 rounded-xl border border-white/10 bg-slate-950/60 p-3">
                 <label className="flex items-start gap-2 text-sm text-slate-200">
                   <input type="checkbox" checked={autoEnabled} disabled={!autoAccountKey} onChange={(event) => changeAutoEnabled(event.target.checked)} className="mt-1" />
-                  <span>此账号自动生成 AI 复盘与薄弱知识点（需先开启；每场首次打开复盘时可能产生费用）</span>
+                  <span>此账号启用答辩结束后自动 AI 复盘</span>
                 </label>
-                <p className="text-xs leading-5 text-slate-400">已缓存的复盘直接读取，不再扣费；重新生成会再次请求。DeepSeek 按实际输入/输出 Token、缓存命中及峰谷时段计费。例如 Flash 在输入 3000、输出 2000 Token 且输入缓存未命中时，按当前官方峰谷价估算约 ¥0.011～¥0.022；并非每次固定费用，具体以官方账单为准。本地 Ollama 不产生 DeepSeek API 调用费。</p>
-                <a href="https://api-docs.deepseek.com/zh-cn/quick_start/pricing" target="_blank" rel="noreferrer" className="text-xs text-cyan-300 underline">查看 DeepSeek 官方实时计费标准</a>
+                <p className="text-xs leading-5 text-slate-400">已缓存的复盘直接读取</p>
               </div>
               {!ai && <p className="mt-4 text-sm text-slate-400">尚未生成 AI 复盘。离线规则复盘已经可以正常使用。</p>}
               {report.answered_count === 0 && <p className="mt-3 text-xs text-amber-200">没有已回答题目，后端不允许生成 AI 复盘。</p>}

@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class HistoryItem(BaseModel):
     id: str
+    mode: Literal["interview", "defense"] = "interview"
     resume_id: str
     status: Literal["active", "completed"]
     reviewer_style: str
@@ -56,7 +57,23 @@ class ReviewTurn(BaseModel):
     score: float | None
     feedback: str | None
 
+class ExampleAnswer(BaseModel):
+    turn_id: int
+    answer: str = Field(min_length=20, max_length=2200)
+    explanation: str = Field(min_length=2, max_length=500)
+
+
+class AIWeakPoint(BaseModel):
+    turn_id: int
+    title: str = Field(min_length=2, max_length=120)
+    reason: str = Field(min_length=2, max_length=500)
+    dimension: Literal["理论依据", "论证逻辑", "研究方法", "数据证据", "创新价值", "答辩表达"]
+
+
 class AIAnalysis(BaseModel):
+    example_answers: list[ExampleAnswer] = Field(default_factory=list, max_length=12)
+    weak_points: list[AIWeakPoint] = Field(default_factory=list, max_length=8)
+
     summary: str = Field(
         min_length=1,
         max_length=800
@@ -79,6 +96,7 @@ class AIAnalysis(BaseModel):
 
 class InterviewReportView(BaseModel):
     session_id: str
+    mode: Literal["interview", "defense"] = "interview"
     status: Literal["completed"]
     reviewer_style: str
 
@@ -99,6 +117,7 @@ class InterviewReportView(BaseModel):
 
     ai_analysis: AIAnalysis | None = None
     ai_generated_at: datetime | None = None
+    practice_focus: dict | None = None
 
     scoring_note: str = (
         "评分来自答辩阶段模型，"

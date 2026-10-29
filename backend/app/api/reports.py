@@ -34,6 +34,9 @@ from app.services.deepseek_interview import (
 )
 
 from app.services.report_ai import create_ai_analysis
+from app.services.ai_study_points import save_weak_points
+from app.services.review_lock import review_lock
+from app.stage8b_auth import require_owner_id
 
 from app.services.report_service import (
     build_report,
@@ -151,11 +154,20 @@ def ai_report(
 
     db: Session = Depends(get_db),
 
+    user_id: str = Depends(require_owner_id),
+
     llm: InterviewLLM = Depends(
         get_interview_llm
     ),
 ) -> InterviewReportView:
 
+    # Serialize non-refresh requests so multiple tabs do not trigger parallel paid calls.
+    with review_lock(user_id, session_id):
+        db.expire_all()
+        return _ai_report_locked(session_id, refresh, db, user_id, llm)
+
+
+def _ai_report_locked(session_id, refresh, db, user_id, llm):
     session = completed_session(
         db,
         session_id,
@@ -169,10 +181,14 @@ def ai_report(
     # 有缓存且没有要求刷新时，直接返回；
     # 不会重复调用 DeepSeek。
     if existing is not None and not refresh:
-        return build_report(
-            db,
-            session,
-        )
+        cached = build_report(db, session)
+        if cached.ai_analysis:
+            try:
+                save_weak_points(user_id, cached, cached.ai_analysis)
+            except Exception as exc:
+                logger.exception("缓存 AI 薄弱点写入失败")
+                raise HTTPException(503, "复习库写入失败，请稍后重试") from exc
+        return cached
 
     report = build_report(
         db,
@@ -207,7 +223,7 @@ def ai_report(
             detail="AI 复盘服务暂不可用",
         ) from exc
 
-    # 保存到 SQLite
+    # 保存到 SQLite；失败不能误报完成或创建孤立知识点。
     try:
 
         if existing is None:
@@ -248,6 +264,14 @@ def ai_report(
         ) from exc
 
     db.expire_all()
+    latest = build_report(db, session)
+    # AI 生成结果已缓存，按账号和题目锚点去重写入复习库。
+    # 独立的知识点 SQLite 写入失败时报告错误；重试会复用缓存。
+    try:
+        save_weak_points(user_id, latest, analysis)
+    except Exception as exc:
+        logger.exception("自动整理 AI 薄弱点失败")
+        raise HTTPException(503, "AI 复盘已保存，但复习库写入失败，请稍后重试") from exc
 
     return build_report(
         db,

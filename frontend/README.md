@@ -85,3 +85,42 @@ API 契约和验证命令见 `../docs/UI_POLISH_PHASE2.md`。
 ## 第八组：AI 复盘增强（Stage 21）
 
 答辩复盘页支持可选自动生成、AI 参考答案、薄弱点自动入复习库、包含原始问答及 AI 示范的 Markdown 导出，并链接官方计费标准。自动生成开关默认关闭，按当前登录用户名隔离；只有进入有回答的已完成复盘时才可能执行一次模型调用。已缓存报告不会重复调用，主动刷新才会产生额外请求。运行 `npm.cmd run test:ui` 和 `npm.cmd run build` 验证。完整变更见 `docs/UI_POLISH_PHASE8.md`。
+
+### Stage 22 / 第九组：自动复盘与专项训练
+
+- 在复盘页主动开启每账号自动 AI 复盘后，后续答辩完成时会在当前会话页面尝试生成并缓存复盘；未开启时不发生自动付费调用。
+- 复盘中的有效低分 AI 薄弱点可以转入专项再练，经过新建答辩页面确认后才正式开始；新场次会保留来源标记。
+- 答辩结束页只保留结果统计与进入完整复盘的入口。
+- 详见 `docs/UI_POLISH_PHASE9.md`；运行 `npm.cmd run test:ui` 和 `npm.cmd run build` 验收。
+
+## Stage 23 · 双模式配置（第十组）
+
+“开始答辩”页顶部可切换 **面试模式**（必选简历，可选材料）与 **项目答辩模式**（必选已建立索引的项目材料，不需要简历）。模式按账号保存在当前浏览器，下次进入可记住；旧记录仍按面试模式读取。答辩模式生成问题时使用资料的 RAG 文本片段，不会分析 PPT 里的图片或图表。下一阶段才开发自我陈述与 PPT 逐页分析。详细设计与测试见 `docs/UI_POLISH_PHASE10.md`。
+
+## Stage 24：本地 PPT 演示与自我陈述
+
+答辩模式进入会话后可在答题区上方查看已选 PPT，支持上一页、下一页、跳页和放大；我的材料页也有相同入口。新上传 PPTX 会同时保留原始文件和 DOCX 文本索引（两者在账号私有目录）；旧版仅 DOCX 上传可文字翻页。若本机没有 PowerPoint 或 LibreOffice，自动降级成文字预览。
+
+“AI 体检本页”和“自我陈述生成追问”只有手动点击才会调用模型，并复用已保存的分析缓存；本地翻页本身不产生费用。若 Whisper 因麦克风问题无法使用，5–8 分钟自我陈述仍可手动输入/粘贴文字。
+
+测试：`npm.cmd run test:ui`、`npm.cmd run build`。详情参阅 `docs/UI_POLISH_PHASE11.md`。
+
+
+### Stage 24A · PPT 翻页兼容修复
+
+- PPT 展示区支持上一页、下一页、键盘方向键 / PageUp / PageDown 和两位数以上页码输入，按 Enter 或失焦后跳页。页码输入过程中不再强行重置为第一页。
+- 页面显式显示“当前第 X 页，共 Y 页”；若只解析到 1 页，会给出原因和重新上传建议，而不是让禁用的下一页按钮看起来像坏了。
+- Windows 若未安装 PowerPoint / LibreOffice，不再仅因为系统安装了 PowerShell 就错误尝试图片渲染，直接使用可翻页的文字模式。
+- 兼容一部分旧 DOCX 衍生文档的页码标题格式。原 PPTX 图片只有曾保存原件才能恢复。
+
+详情及验收：`docs/PPT_PAGE_FIX_STAGE24A.md`。测试 `npm.cmd run test:ui`、`npm.cmd run build` 与 `pytest -q tests/test_group11_local_presentation.py`。
+
+## Stage 24B · 整体验收与现行手册
+
+当前完整版本包括双模式、PDF/DOCX/PPTX 资料、项目 PPT 本地翻页（含 Stage 24A 热修）、文字级逐页 AI 体检、自我陈述与复盘后专项再练。此前各阶段文档是**开发记录**；若前文描述了“下一组开发”“只有 DOCX 预览”等历史限制，请以当前完整版手册为准：
+
+- `../docs/manuals/STAGE24A_WINDOWS_INSTALL.md`：Windows 安装、启动、配置、安全和故障定位。
+- `../docs/manuals/STAGE24A_USER_GUIDE.md`：实际操作流程、付费调用边界、PPT 翻页及复盘。
+- `../docs/UI_POLISH_PHASE12.md`：本轮清理与验收说明。
+
+PPT 原件由本机渲染，文字版负责 RAG。逐页体检仅理解文字，不能直接理解 PPT 图表的视觉内容；没有 Office/LibreOffice 时可文字翻页。语音和麦克风问题属于单独的可选功能，支持始终使用纯文字答辩。

@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
   BookOpenCheck,
   CheckCircle2,
-  CircleHelp,
   LoaderCircle,
   RefreshCw,
   Send,
@@ -14,10 +13,14 @@ import {
   finishInterview,
   getInterview,
   getInterviewReport,
+  generateAIInterviewReport,
 } from '../lib/interviews'
 import { messageOf } from '../lib/resources'
+import { autoReviewEnabled, completionReviewMarker, markCompleted } from '../lib/autoReviewPreference'
 import { appendRecognizedText, VOICE_STATUS_EVENT, VOICE_TRANSCRIPT_EVENT, TIMER_GATE_EVENT } from '../lib/answerDraftBridge'
 import type { TurnStatusDetail, VoiceTranscriptDetail } from '../lib/answerDraftBridge'
+import SlideDeck from '../components/presentation/SlideDeck'
+import OpeningStatement from '../components/presentation/OpeningStatement'
 import type {
   InterviewEvaluation,
   InterviewReport,
@@ -56,6 +59,8 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
   const [report, setReport] = useState<InterviewReport | null>(null)
   const [reportError, setReportError] = useState('')
   const [reportRefresh, setReportRefresh] = useState(0)
+  const [autoReviewState, setAutoReviewState] = useState('')
+  const autoAttempted = useRef(new Set<string>())
 
   useEffect(() => {
     const controller = new AbortController()
@@ -92,6 +97,32 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
       })
     return () => { live = false; controller.abort() }
   }, [sessionId, session?.status, reportRefresh])
+
+  // Auto review is explicitly opt-in per username. On completion, request the
+  // existing cache-aware endpoint once. This never delays or rolls back answers.
+  useEffect(() => {
+    if (session?.status !== 'completed' || !session.turns.some((turn) => turn.answer !== null) ||
+        autoAttempted.current.has(sessionId)) return
+    try { if (window.sessionStorage.getItem(completionReviewMarker(sessionId)) !== '1') return }
+    catch { return }
+    autoAttempted.current.add(sessionId)
+    try { window.sessionStorage.removeItem(completionReviewMarker(sessionId)) } catch { /* ignored */ }
+    let live = true
+    void (async () => {
+      try {
+        const response = await fetch('/api/auth/me', { credentials: 'same-origin', cache: 'no-store' })
+        if (!response.ok) return
+        const account = await response.json() as { username?: string }
+        if (!account.username || !autoReviewEnabled(account.username, window.localStorage)) return
+        if (live) setAutoReviewState('已启用自动 AI 复盘，正在检查缓存或生成…')
+        await generateAIInterviewReport(sessionId, false)
+        if (live) { setAutoReviewState('AI 复盘已保存，薄弱点已整理到复习库。'); setReportRefresh((prev) => prev + 1) }
+      } catch (error) {
+        if (live) setAutoReviewState(`自动复盘未完成：${messageOf(error)}。请进入复盘页重试。`)
+      }
+    })()
+    return () => { live = false }
+  }, [sessionId, session?.status])
 
   const pending = session?.status === 'active'
     ? session.turns[session.turns.length - 1]
@@ -146,6 +177,7 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
         answer: normalized,
         user_feedback: feedback,
       })
+      if (result.session.status === 'completed') markCompleted(sessionId, window.sessionStorage)
       setSession(result.session)
       setEvaluation(result.evaluation)
       setAnswer('')
@@ -169,6 +201,7 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
     setActionError('')
     try {
       const next = await finishInterview(sessionId)
+      markCompleted(sessionId, window.sessionStorage)
       setSession(next)
       setEvaluation(null)
       setNotice('答辩已结束，可查看离线规则复盘。')
@@ -188,7 +221,7 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
         </a>
         <div className="mt-5 mb-7 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold"><BookOpenCheck className="size-7 text-cyan-300" /> 答辩会话</h1>
+            <h1 className="flex items-center gap-2 text-2xl font-bold"><BookOpenCheck className="size-7 text-cyan-300" /> {session?.mode === 'defense' ? '项目答辩会话' : '模拟面试会话'}</h1>
             <p className="mt-2 break-all font-mono text-xs text-slate-500">{sessionId}</p>
           </div>
           <button type="button" onClick={() => setRefreshCounter((prev) => prev + 1)} disabled={!!busy || loading}
@@ -246,7 +279,15 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
             </div>}
 
             {session.status === 'active' && currentQuestion && (
-              <section className="mt-6 rounded-2xl border border-cyan-400/20 bg-slate-900 p-5 sm:p-6">
+              <div className={session.mode === 'defense' ? 'mt-6 grid items-start gap-5 xl:grid-cols-2' : 'mt-6'}>
+                {session.mode === 'defense' && <div className="min-w-0 xl:sticky xl:top-4">
+                  <SlideDeck materialIds={session.material_ids} />
+                </div>}
+                <div className="min-w-0">
+                  {session.mode === 'defense' && <OpeningStatement sessionId={sessionId}
+                    ready={session.turns.length === 1 && session.turns[0].answer === null}
+                    onUpdated={() => setRefreshCounter((previous) => previous + 1)} />}
+              <section className="rounded-2xl border border-cyan-400/20 bg-slate-900 p-5 sm:p-6">
                 <h2 className="mb-3 text-lg font-semibold">回答当前题目</h2>
                 <div className="mb-5 rounded-xl border border-cyan-400/25 bg-cyan-400/5 p-4">
                   <p className="mb-2 text-xs text-cyan-300">第 {currentQuestion.question_number} 道主问题{currentQuestion.followup_number ? ` · 第 ${currentQuestion.followup_number} 次追问` : ''} · 难度 {currentQuestion.difficulty}/5</p>
@@ -284,6 +325,8 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
                   </button>
                 </div>
               </section>
+                </div>
+              </div>
             )}
 
             {session.status === 'active' && !currentQuestion && (
@@ -292,26 +335,24 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
               </div>
             )}
 
+            {session.mode === 'defense' && session.status === 'completed' && <SlideDeck materialIds={session.material_ids} />}
+
             {session.status === 'completed' && (
               <section className="mt-6 rounded-2xl border border-emerald-400/20 bg-slate-900/75 p-5 sm:p-6">
                 <h2 className="flex items-center gap-2 text-lg font-semibold"><CheckCircle2 className="size-5 text-emerald-300" /> 答辩已结束</h2>
-                <a href={`#report/${encodeURIComponent(sessionId)}`} className="mt-3 inline-flex items-center rounded-lg border border-cyan-400/30 px-3 py-2 text-sm font-semibold text-cyan-200 hover:bg-cyan-400/10">查看完整复盘与导出</a>
+                <p className="mt-2 text-sm text-slate-400">已结束本场练习。详细优势、不足、AI 参考答案及导出统一在完整复盘中查看。</p>
+                {report && (
+                  <div className="mt-4 grid grid-cols-3 gap-3 text-center text-sm">
+                    <div className="rounded-xl bg-slate-950/50 p-3">已答 <strong>{report.answered_count}</strong></div>
+                    <div className="rounded-xl bg-slate-950/50 p-3">未答 <strong>{report.unanswered_count}</strong></div>
+                    <div className="rounded-xl bg-slate-950/50 p-3">均分 <strong>{scoreLabel(report.average_score)}</strong></div>
+                  </div>
+                )}
+                <a href={`#report/${encodeURIComponent(sessionId)}`} className="mt-5 inline-flex w-full justify-center rounded-xl bg-cyan-400 px-5 py-3 text-base font-semibold text-slate-950 hover:bg-cyan-300">查看完整复盘与导出</a>
+                {autoReviewState && <p role="status" className="mt-3 text-sm text-cyan-200">{autoReviewState}</p>}
                 {notice && <p className="mt-3 text-sm text-emerald-300">{notice}</p>}
                 {reportError && <p role="alert" className="mt-4 text-sm text-rose-200">复盘加载失败：{reportError}</p>}
                 {!report && !reportError && <p className="mt-3 text-sm text-slate-400">正在加载离线复盘…</p>}
-                {report && (
-                  <div className="mt-5 space-y-5">
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-xl bg-slate-950/50 p-4"><p className="text-xs text-slate-400">已回答</p><p className="mt-1 text-2xl font-semibold">{report.answered_count}</p></div>
-                      <div className="rounded-xl bg-slate-950/50 p-4"><p className="text-xs text-slate-400">未回答</p><p className="mt-1 text-2xl font-semibold">{report.unanswered_count}</p></div>
-                      <div className="rounded-xl bg-slate-950/50 p-4"><p className="text-xs text-slate-400">平均分</p><p className="mt-1 text-2xl font-semibold">{scoreLabel(report.average_score)}</p></div>
-                    </div>
-                    <div><h3 className="font-semibold text-emerald-200">优势</h3><ul className="mt-2 space-y-2 text-sm text-slate-300">{report.strengths.map((value, i) => <li key={i} className="whitespace-pre-wrap">• {value}</li>)}</ul></div>
-                    <div><h3 className="font-semibold text-amber-200">需要加强</h3><ul className="mt-2 space-y-2 text-sm text-slate-300">{report.improvements.map((value, i) => <li key={i} className="whitespace-pre-wrap">• {value}</li>)}</ul></div>
-                    <div><h3 className="font-semibold text-cyan-200">下一步建议</h3><ul className="mt-2 space-y-2 text-sm text-slate-300">{report.suggestions.map((value, i) => <li key={i} className="whitespace-pre-wrap">• {value}</li>)}</ul></div>
-                    <p className="flex gap-2 text-xs leading-5 text-slate-500"><CircleHelp className="size-4 shrink-0" />{report.scoring_note}</p>
-                  </div>
-                )}
               </section>
             )}
           </>

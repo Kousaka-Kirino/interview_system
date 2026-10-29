@@ -12,10 +12,8 @@ from app.schemas.interview import (
 
 
 class StartInterviewRequest(BaseModel):
-    resume_id: str = Field(
-        min_length=1,
-        max_length=36,
-    )
+    mode: Literal["interview", "defense"] = "interview"
+    resume_id: str | None = Field(default=None, min_length=1, max_length=36)
 
     material_ids: list[str] = Field(
         default_factory=list,
@@ -25,6 +23,8 @@ class StartInterviewRequest(BaseModel):
     config: InterviewConfig = Field(
         default_factory=InterviewConfig
     )
+
+    focus_session_id: str | None = Field(default=None, min_length=36, max_length=36)
 
 
 class SubmitAnswerRequest(BaseModel):
@@ -54,6 +54,7 @@ class TurnView(BaseModel):
 
 class SessionView(BaseModel):
     id: str
+    mode: Literal["interview", "defense"] = "interview"
     resume_id: str
     material_ids: list[str]
     config: InterviewConfig
@@ -71,6 +72,7 @@ class SessionView(BaseModel):
 
     created_at: datetime
     turns: list[TurnView]
+    practice_focus: dict | None = None
 
 
 class AnswerEvaluation(BaseModel):

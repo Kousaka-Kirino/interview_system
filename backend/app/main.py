@@ -42,7 +42,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# stage10d:pptx-direct-route -- avoid collision with material-id permission checks
+# Register the static PPTX import route before resource-id paths.
 from app.stage10_pptx import import_pptx as stage10d_import_pptx
 
 app.add_api_route(
@@ -53,15 +53,15 @@ app.add_api_route(
     tags=["materials-pptx"],
 )
 
-# 原有接口
+# Core application routes
 app.include_router(interviews_router)
 app.include_router(resumes_router)
 app.include_router(materials_router)
 
-# Stage 4：静态 history/statistics 路由先注册
+# Static report routes must precede dynamic session-id routes.
 app.include_router(reports_router)
 
-# Stage 3：包含 /{session_id} 动态路由
+# Dynamic session-id routes
 app.include_router(sessions_router)
 
 
@@ -73,27 +73,27 @@ def health() -> dict[str, str]:
     }
 
 
-# stage7:router - local review and knowledge annotations
+# Local review and knowledge annotations
 from app.stage7_review import router as stage7_review_router
 
 app.include_router(stage7_review_router)
 
-# stage8b:auth - local single-owner login barrier
+# Local authentication middleware
 from app.stage8b_auth import install_auth as stage8b_install_auth
 
 stage8b_install_auth(app)
 
-# stage8c2:scope - primary-resource ownership checks (single-owner transition)
+# Per-account resource ownership checks
 from app.stage8c2_guard import install_owner_scope as stage8c2_install_owner_scope
 
 stage8c2_install_owner_scope(app)
 
-# stage9:voice - local audio transcription router
+# Local audio transcription
 from app.stage9_speech import router as stage9_speech_router
 
 app.include_router(stage9_speech_router)
 
-# stage10:pptx-import -- reuse existing DOCX material indexing route
+# PPTX text indexing reuses the document material pipeline
 from app.stage10_pptx import router as stage10_pptx_router
 
 app.include_router(stage10_pptx_router)

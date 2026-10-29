@@ -35,7 +35,7 @@ def _get_model():
             try:
                 from faster_whisper import WhisperModel
             except ImportError as exc:
-                raise HTTPException(503, "语音识别组件尚未安装，请运行 Stage 9 安装脚本。") from exc
+                raise HTTPException(503, "语音识别组件尚未安装，请在项目虚拟环境安装 faster-whisper。") from exc
             # Stage 9 uses small CPU-friendly base model; never call Ollama here.
             try:
                 _MODEL = WhisperModel("base", device="cpu", compute_type="int8")

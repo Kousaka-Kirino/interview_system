@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { materialApi } from '../lib/api'
 import DocumentPreview from '../components/DocumentPreview'
+import SlideDeck from '../components/presentation/SlideDeck'
 import { formatDate, formatSize, messageOf, validateDocument } from '../lib/resources'
 import type { MaterialInfo, MaterialSearchHit } from '../types/resources'
 
@@ -27,6 +28,7 @@ function validateMaterialFile(file: File | null): string | null {
 export default function MaterialsPage() {
   const [items, setItems] = useState<MaterialInfo[]>([])
   const [previewFile, setPreviewFile] = useState<{ id: string; name: string } | null>(null)
+  const [slideMaterialId, setSlideMaterialId] = useState<string | null>(null)
   const [refresh, setRefresh] = useState(0)
   const [loading, setLoading] = useState(true)
   const [listError, setListError] = useState<string | null>(null)
@@ -207,6 +209,11 @@ export default function MaterialsPage() {
                         <p className="mt-1 text-xs text-slate-400">{formatSize(item.file_size)} · {item.chunk_count} 个片段 · {formatDate(item.created_at)}</p>
                       </div>
                     </label>
+                    {item.original_filename.endsWith('_PPTX文字提取版.docx') &&
+                      <button type="button" onClick={() => setSlideMaterialId((prev) => prev === item.id ? null : item.id)}
+                        className="rounded-lg border border-cyan-400/30 px-3 py-2 text-sm text-cyan-200 hover:bg-white/10">
+                        {slideMaterialId === item.id ? '收起幻灯片' : '本地幻灯片展示'}
+                      </button>}
                     <button type="button" onClick={() => setPreviewFile({ id: item.id, name: item.original_filename })}
                       className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-sm text-cyan-200 hover:bg-white/10"><Eye className="size-4" /> 预览原文</button>
                     <button
@@ -273,6 +280,7 @@ export default function MaterialsPage() {
           </div>}
           </div>}
         </section>
+        {slideMaterialId && <SlideDeck materialIds={[slideMaterialId]} />}
       </div>
       {previewFile && <DocumentPreview kind="material" file={previewFile} onClose={() => setPreviewFile(null)} />}
     </main>

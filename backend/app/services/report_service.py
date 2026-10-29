@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.report import InterviewAIReport
 from app.models.session import InterviewSession, InterviewTurn
+from app.services.focus_practice import focus_of
+from app.services.practice_mode import practice_mode
 
 from app.schemas.report import (
     AIAnalysis,
@@ -77,6 +79,7 @@ def get_history(
         items.append(
             HistoryItem(
                 id=s.id,
+                mode=practice_mode(s.config_data),
                 resume_id=s.resume_id,
                 status=s.status,
                 reviewer_style=(
@@ -240,11 +243,6 @@ def build_report(
         if t.score < 60
     ][:3]
 
-    if not strengths:
-        strengths = [
-            "本次没有达到80分的已评分题目；"
-            "建议结合逐题反馈寻找进步点。"
-        ]
 
     if not improvements:
         improvements = [
@@ -282,7 +280,9 @@ def build_report(
 
     return InterviewReportView(
         session_id=session.id,
+        mode=practice_mode(session.config_data),
         status="completed",
+        practice_focus=focus_of(session),
         reviewer_style=config.get(
             "reviewer_style",
             "neutral"

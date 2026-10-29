@@ -1,8 +1,10 @@
-// Shared contracts used by Stage 5A dashboard and Stage 5C interview workflow.
+// Shared types for the dashboard, sessions and both practice modes.
+export type PracticeMode = 'interview' | 'defense'
 export type InterviewStatus = 'active' | 'completed'
 
 export interface HistoryItem {
   id: string
+  mode?: PracticeMode
   resume_id: string
   status: InterviewStatus
   reviewer_style: string
@@ -46,7 +48,7 @@ export type InterviewerStyle = 'friendly' | 'neutral' | 'pressure'
 export type InterviewDifficulty = 'easy' | 'medium' | 'hard'
 export type UserDifficultyFeedback = 'none' | 'too_easy' | 'just_right' | 'too_hard'
 
-// The Stage 3 backend expects numerical difficulty/adaptation configuration.
+// The backend accepts numeric difficulty and adaptation values.
 export interface BackendInterviewConfig {
   reviewer_style: InterviewerStyle
   initial_difficulty: number // 1..5
@@ -63,7 +65,7 @@ export interface InterviewConfig {
   adaptationLevel: number
 }
 
-// Compatibility with the Stage 5C first-draft UI, if referenced elsewhere.
+// Retained for compatibility with the original interview form.
 export interface InterviewCreateRequest {
   resume_id: string
   material_ids: string[]
@@ -73,9 +75,11 @@ export interface InterviewCreateRequest {
 }
 
 export interface BackendInterviewCreateRequest {
-  resume_id: string
+  mode?: PracticeMode
+  resume_id?: string
   material_ids: string[]
   config: BackendInterviewConfig
+  focus_session_id?: string
 }
 
 export interface InterviewTurn {
@@ -92,6 +96,7 @@ export interface InterviewTurn {
 
 export interface InterviewSession {
   id: string
+  mode?: PracticeMode
   resume_id: string
   material_ids: string[]
   config: BackendInterviewConfig
@@ -103,6 +108,7 @@ export interface InterviewSession {
   negative_streak: number
   created_at: string
   turns: InterviewTurn[]
+  practice_focus?: { source_session_id: string; weak_points: Array<{title: string; dimension: string; reason: string}> } | null
 }
 
 export type InterviewCreateResponse = InterviewSession
@@ -137,6 +143,7 @@ export interface ReportTurn {
 
 export interface InterviewReport {
   session_id: string
+  mode?: PracticeMode
   status: InterviewStatus
   reviewer_style: string
   planned_main_questions: number
@@ -151,5 +158,6 @@ export interface InterviewReport {
   suggestions: string[]
   ai_analysis: Record<string, unknown> | null
   ai_generated_at: string | null
+  practice_focus?: { source_session_id: string; weak_points: Array<{title: string; dimension: string; reason: string}> } | null
   scoring_note: string
 }

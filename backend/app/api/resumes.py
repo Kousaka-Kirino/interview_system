@@ -13,6 +13,7 @@ from app.core.config import Settings
 from app.stage11_local import get_user_settings
 from app.core.database import get_db
 from app.models.resume import Resume
+from app.services.practice_mode import is_internal_resume
 from app.schemas.resume import ResumeCorrections, ResumeDetail, ResumeListItem
 from app.services.resume_parser import extract_resume_text, parse_resume_sections, resume_quality
 from app.services.document_preview import preview_document
@@ -25,7 +26,7 @@ ALLOWED_EXTENSIONS = {".pdf", ".docx"}
 
 def _resume_or_404(resume_id: str, db: Session) -> Resume:
     resume = db.get(Resume, resume_id)
-    if resume is None:
+    if resume is None or is_internal_resume(resume):
         raise HTTPException(status_code=404, detail="简历不存在")
     return resume
 
@@ -99,7 +100,8 @@ async def upload_resume(
 
 @router.get("", response_model=list[ResumeListItem])
 def list_resumes(db: Session = Depends(get_db)) -> list[dict]:
-    return [_payload(r, detail=False) for r in db.scalars(select(Resume).order_by(Resume.created_at.desc())).all()]
+    return [_payload(r, detail=False) for r in db.scalars(select(Resume).order_by(Resume.created_at.desc())).all()
+            if not is_internal_resume(r)]
 
 
 @router.get("/{resume_id}", response_model=ResumeDetail)

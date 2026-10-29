@@ -765,3 +765,11 @@ Stage 8C-3：根据实际业务模型逐接口实现列表/统计过滤和上传
 
 Local signup, user-specific SQLite/upload/Chroma workspaces, authentication and rollback details:
 See `docs/STAGE11_LOCAL_REGISTRATION.md`.
+
+### Stage 24 项目答辩展示（第十一组）
+
+新上传的 PPTX 除转换为 DOCX 进行 RAG 外，还在账号专用上传目录留存原件。项目答辩会话可本地翻页/放大（Office/LibreOffice 渲染图片，失败则仅显示可选中文字）；逐页 AI 体检只查看文字。自我陈述支持 5–8 分钟练习计时、分段本地 Whisper 转写或手动输入，分析后更新第一道未答题；不在页面后台自动调用 AI。详见 `docs/UI_POLISH_PHASE11.md`。
+
+## Stage 24B 当前使用入口（整合更新）
+
+截至 Stage 24A PPT 翻页热修，项目支持面试模式与项目答辩模式、独立账户数据、简历修正、材料 RAG、PPT 本地翻页（有本机 PowerPoint/LibreOffice 时可渲染版式）、自我陈述、AI 逐页**文字**体检、评分复盘和薄弱点专项再练。PPT 视觉图表理解和语音输入兼容性仍有限制。用户操作以 `docs/manuals/STAGE24A_USER_GUIDE.md` 为准；Windows 部署与隐私保护以 `docs/manuals/STAGE24A_WINDOWS_INSTALL.md` 为准；本组变更见 `docs/UI_POLISH_PHASE12.md`。

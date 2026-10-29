@@ -1,3 +1,4 @@
+import { markCompleted } from '../../lib/autoReviewPreference'
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import './speechTimer.css'
@@ -128,9 +129,7 @@ export default function DefenseVoiceTimer() {
       if (!active) return
       // Stage 9B: keep the countdown and microphone with the ORIGINAL answer field.
       // Never prepend the add-on to <main> (that puts it above the question).
-      const fields = Array.from(document.querySelectorAll<HTMLTextAreaElement>('main textarea:not(.stage9-textarea)'))
-      const answerField = fields.find((field) => field.getClientRects().length > 0 && !field.disabled)
-        ?? fields.find((field) => field.getClientRects().length > 0)
+      const answerField = document.querySelector<HTMLTextAreaElement>('#current-answer')
       const holder = answerField?.parentElement
       if (!holder || !answerField) {
         if (element.isConnected) element.remove()
@@ -309,6 +308,7 @@ export default function DefenseVoiceTimer() {
         method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json' },
       })
       if (!response.ok) throw await apiError(response)
+      markCompleted(sessionId, window.sessionStorage)
       window.location.reload()
     } catch (cause) {
       setError(`${messageOf(cause)} 如果服务端已完成，请刷新页面检查状态。`)

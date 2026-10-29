@@ -154,7 +154,7 @@ def _allow_origin(request: Request) -> bool:
 class _AuthBarrier(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path.rstrip("/") or "/"
-        # Always restrict the backend to loopback until Stage 8C is done.
+        # Keep the local-only access restriction for account and document privacy.
         if not _client_is_local(request):
             return _json_error(403, "本阶段仅允许本机访问。")
         if request.method == "OPTIONS":
@@ -173,7 +173,7 @@ class _AuthBarrier(BaseHTTPMiddleware):
                 if row["must_change_password"]:
                     return _json_error(403, "请先修改初始密码。")
         except (sqlite3.Error, RuntimeError):
-            return _json_error(503, "账户服务未初始化或不可用，请确认 Stage 8A / 8B 已完成。")
+            return _json_error(503, "账户服务暂不可用，请检查后端启动日志和本地账号数据库。")
         response = await call_next(request)
         if path.startswith("/api/"):
             response.headers.setdefault("Cache-Control", "no-store")
@@ -416,7 +416,7 @@ def _get_profile(db: sqlite3.Connection, user_id: str) -> dict[str, Any]:
         FROM app_users u JOIN app_user_profiles p ON p.user_id=u.id
         WHERE u.id=?""", (user_id,)).fetchone()
     if row is None:
-        raise HTTPException(503, "个人资料尚未初始化，请重新安装 Stage 8C。")
+        raise HTTPException(503, "个人资料尚未初始化，请检查账户数据库并联系项目维护者。")
     return {"user_id": row["id"], "username": row["username"],
             "display_name": row["display_name"], "email": row["email"],
             "email_verified": False}
