@@ -376,7 +376,9 @@ export default function InterviewReportPage({ sessionId }: { sessionId: string }
                   <input type="checkbox" checked={autoEnabled} disabled={!autoAccountKey} onChange={(event) => changeAutoEnabled(event.target.checked)} className="mt-1" />
                   <span>此账号启用答辩结束后自动 AI 复盘</span>
                 </label>
-                <p className="text-xs leading-5 text-slate-400">已缓存的复盘直接读取</p>
+                <p className="text-xs leading-5 text-slate-400">已缓存的复盘直接读取，不会再次请求模型；主动重新生成会重新调用模型，并可能产生新的费用。</p>
+                <p className="text-xs leading-5 text-slate-400">费用计算示例：输入 3000、输出 2000 Token，仅用于说明计费所依据的用量。实际金额取决于模型、缓存命中情况及峰谷时段，并非每次固定费用；请以官方价格和账单为准。本地 Ollama 不产生 DeepSeek API 调用费。</p>
+                <a href="https://api-docs.deepseek.com/zh-cn/quick_start/pricing" target="_blank" rel="noopener noreferrer" className="text-xs text-cyan-300 underline">查看 DeepSeek 官方计费标准</a>
               </div>
               {!ai && <p className="mt-4 text-sm text-slate-400">尚未生成 AI 复盘。离线规则复盘已经可以正常使用。</p>}
               {report.answered_count === 0 && <p className="mt-3 text-xs text-amber-200">没有已回答题目，后端不允许生成 AI 复盘。</p>}

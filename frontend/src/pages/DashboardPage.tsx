@@ -9,7 +9,6 @@ import {
   Clock3,
   RefreshCw,
   ExternalLink,
-  Server,
   TrendingUp,
   TriangleAlert,
 } from 'lucide-react'
