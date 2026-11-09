@@ -73,6 +73,8 @@ class SessionView(BaseModel):
     created_at: datetime
     turns: list[TurnView]
     practice_focus: dict | None = None
+    opening_required: bool = False  # old sessions remain compatible
+    opening_completed: bool = False
 
 
 class AnswerEvaluation(BaseModel):
