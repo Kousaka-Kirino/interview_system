@@ -109,6 +109,8 @@ export interface InterviewSession {
   created_at: string
   turns: InterviewTurn[]
   practice_focus?: { source_session_id: string; weak_points: Array<{title: string; dimension: string; reason: string}> } | null
+  opening_required?: boolean
+  opening_completed?: boolean
 }
 
 export type InterviewCreateResponse = InterviewSession

@@ -86,9 +86,9 @@ export default function OpeningStatement({ sessionId, ready, onUpdated }: { sess
   if (!ready && !analysis) return null
   return <section className="mt-6 rounded-2xl border border-white/10 bg-slate-900 p-5 sm:p-6" aria-label="自我陈述模拟">
     <h2 className="mb-2 flex items-center gap-2 text-lg font-semibold"><Timer className="size-5 text-cyan-300" /> 5–8 分钟自我陈述模拟</h2>
-    <p className="mb-4 text-sm leading-6 text-slate-400">可以边看上方 PPT 边口述。点击计时练习；每段录音最多约 105 秒，由本地 Whisper 转成文字后追加。麦克风不可用时可直接输入或粘贴文字，AI 仅在点击分析后调用。</p>
+    <p className="mb-4 text-sm leading-6 text-slate-400">可以边看上方 PPT 边口述。点击计时练习；每段录音最多约 105 秒，由本地 Whisper 转成文字后追加。麦克风不可用时可直接输入或粘贴文字，只有点击“结束陈述并生成第一题”后，才会把陈述与PPT检索片段提交给AI并出题。</p>
     {analysis ? <div className="space-y-2 rounded-xl bg-slate-950/60 p-4 text-sm leading-7">
-      <p className="text-emerald-300">陈述分析已保存，第一道未答题目已更新为针对陈述的追问。</p>
+      <p className="text-emerald-300">陈述已完成，AI 已结合 PPT 和陈述生成第一道问题。</p>
       <p><strong>总体反馈：</strong>{analysis.summary}</p>
       <p><strong>表达优势：</strong>{analysis.strengths.join('；')}</p>
       <p><strong>改进点：</strong>{analysis.improvements.join('；')}</p>
@@ -107,7 +107,7 @@ export default function OpeningStatement({ sessionId, ready, onUpdated }: { sess
       </div>
       <label htmlFor="opening-statement-text" className="text-sm text-slate-300">自我陈述文字（至少 30 字，最多 10000 字）</label>
       <textarea id="opening-statement-text" value={text} rows={6} maxLength={10000} onChange={(e) => setText(e.target.value)} placeholder="简述研究背景、方法、实验结果、创新点及不足…" className="mt-2 w-full resize-y rounded-xl border border-white/15 bg-slate-950 p-3 text-sm leading-7" />
-      <button type="button" onClick={() => void submit()} disabled={busy || recording || transcribing || text.trim().length < 30} className="mt-3 rounded-lg bg-cyan-400 px-5 py-2.5 font-semibold text-slate-950 disabled:opacity-40">{busy ? 'AI 分析中…' : '完成陈述并生成追问（会产生 AI 费用）'}</button>
+      <button type="button" onClick={() => void submit()} disabled={busy || recording || transcribing || text.trim().length < 30} className="mt-3 rounded-lg bg-cyan-400 px-5 py-2.5 font-semibold text-slate-950 disabled:opacity-40">{busy ? 'AI 分析中…' : '结束陈述并生成第一题（会产生 AI 费用）'}</button>
     </>}
     {error && <p role="alert" className="mt-3 text-sm text-rose-300">{error}</p>}
   </section>

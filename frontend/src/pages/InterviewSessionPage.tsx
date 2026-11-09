@@ -129,6 +129,8 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
     : undefined
   const currentQuestion = pending && !answered(pending) ? pending : null
   const completedTurns = session?.turns.filter(answered) ?? []
+  const awaitingOpening = session?.mode === 'defense' && session.status === 'active' &&
+    session.opening_required && !session.opening_completed
 
   useEffect(() => {
     // Do not carry busy/timing status from the previous question into the next one.
@@ -164,7 +166,7 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
   }, [sessionId, currentQuestion?.id])
 
   async function submitAnswer() {
-    if (!session || !currentQuestion || busy || voiceBusy || timerBlocked) return
+    if (!session || !currentQuestion || awaitingOpening || busy || voiceBusy || timerBlocked) return
     const normalized = answer.trim()
     if (!normalized) { setActionError('请先输入回答。'); return }
     if (normalized.length > 10000) { setActionError('回答最多 10000 字符。'); return }
@@ -251,7 +253,7 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
             <section className="rounded-2xl border border-white/10 bg-slate-900/75 p-5 sm:p-6">
               <h2 className="mb-5 text-lg font-semibold">本场问答记录</h2>
               <div className="space-y-3">
-                {completedTurns.length === 0 && <p className="text-sm text-slate-400">暂无已回答题目，请在下方回答当前题。</p>}
+                {completedTurns.length === 0 && <p className="text-sm text-slate-400">{awaitingOpening ? '尚处于 PPT 自我陈述阶段；完成陈述后才会出题。' : '暂无已回答题目，请在下方回答当前题。'}</p>}
                 {completedTurns.map((turn) => (
                   <details key={turn.id} className="group rounded-xl border border-white/10 bg-slate-950/40">
                     <summary className="cursor-pointer list-none rounded-xl px-4 py-3 text-sm text-slate-200 marker:hidden hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400">
@@ -278,7 +280,23 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
               <p className="mt-2 text-xs text-slate-400">难度调整：{evaluation.adaptation_reason}</p>
             </div>}
 
-            {session.status === 'active' && currentQuestion && (
+            {awaitingOpening && (
+              <div className="mt-6 grid items-start gap-5 xl:grid-cols-2" data-defense-opening="required">
+                <div className="min-w-0 xl:sticky xl:top-4">
+                  <SlideDeck materialIds={session.material_ids} />
+                </div>
+                <div className="min-w-0">
+                  <div role="status" className="rounded-2xl border border-cyan-400/25 bg-cyan-400/5 p-4 text-sm leading-7 text-cyan-100">
+                    <strong>第一阶段：PPT 自我陈述</strong>
+                    <p>请先翻页完整陈述。此阶段不会预先生成或显示问题，答题倒计时也尚未开始。</p>
+                    <p>陈述结束后点击下方按钮，系统才会把你的陈述与 PPT 文字片段交给 AI，生成第一道问题。</p>
+                  </div>
+                  <OpeningStatement sessionId={sessionId} ready={true}
+                    onUpdated={() => setRefreshCounter((previous) => previous + 1)} />
+                </div>
+              </div>
+            )}
+            {session.status === 'active' && currentQuestion && !awaitingOpening && (
               <div className={session.mode === 'defense' ? 'mt-6 grid items-start gap-5 xl:grid-cols-2' : 'mt-6'}>
                 {session.mode === 'defense' && <div className="min-w-0 xl:sticky xl:top-4">
                   <SlideDeck materialIds={session.material_ids} />
@@ -329,7 +347,7 @@ export default function InterviewSessionPage({ sessionId }: { sessionId: string 
               </div>
             )}
 
-            {session.status === 'active' && !currentQuestion && (
+            {session.status === 'active' && !currentQuestion && !awaitingOpening && (
               <div className="mt-5 rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 text-sm text-amber-200">
                 当前会话没有待答题，可能存在状态不同步。请刷新会话查看服务器最新状态。
               </div>
