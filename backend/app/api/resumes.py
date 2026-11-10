@@ -10,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
-from app.stage11_local import get_user_settings
+from app.account_storage import get_user_settings
 from app.core.database import get_db
 from app.models.resume import Resume
 from app.services.practice_mode import is_internal_resume

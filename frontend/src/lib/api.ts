@@ -170,7 +170,7 @@ export const materialApi = {
   list: (signal?: AbortSignal) => request<MaterialInfo[]>('/api/materials', { signal }),
   upload: (file: File) =>
     request<MaterialInfo>(
-      // stage10:pptx-import -- DOCX derivative uses existing RAG pipeline
+      // PPTX import: DOCX derivative reuses existing RAG pipeline
       file.name.toLowerCase().endsWith('.pptx') ? '/api/pptx-import' : '/api/materials',
       { method: 'POST', body: fileBody(file) },
     ),

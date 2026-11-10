@@ -1,4 +1,4 @@
-import './stage7c-dark.css'
+import './reviewDark.css'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { BookOpen, CheckCircle2, ChevronRight, Flag, RefreshCw, Search, ShieldQuestion, X } from 'lucide-react'
 import RadarChart from './RadarChart'
@@ -11,7 +11,7 @@ function sourceHighlight(text: string, quote: string) {
   if (start < 0) return <span className="whitespace-pre-wrap">{text}</span>
   return <>
     <span className="whitespace-pre-wrap">{text.slice(0, start)}</span>
-    <mark id="stage7-highlight" className="rounded bg-amber-500/30 px-0.5 text-slate-50 ring-1 ring-amber-400/60">{quote}</mark>
+    <mark id="review-highlight" className="rounded bg-amber-500/30 px-0.5 text-slate-50 ring-1 ring-amber-400/60">{quote}</mark>
     <span className="whitespace-pre-wrap">{text.slice(start + quote.length)}</span>
   </>
 }
@@ -76,7 +76,7 @@ function KnowledgeDetail({ point, onClose, onSaved }: { point: KnowledgePoint; o
     finally { setBusy(false) }
   }
   return <div className="fixed inset-0 z-[190] flex items-center justify-center bg-slate-950/65 p-3" role="dialog" aria-modal="true" aria-label="知识点原文定位与复习标记" onMouseDown={event => { if (event.target === event.currentTarget) onClose() }}>
-    <div className="stage7c-dark max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-slate-900 p-5 shadow-2xl sm:p-7">
+    <div className="review-workspace-dark max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-slate-900 p-5 shadow-2xl sm:p-7">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold text-cyan-300">原文定位 · {point.dimension} · {point.orientation}</p>
@@ -292,7 +292,7 @@ function RiskTable({ summary, points, onOpen, onFilter }: {
 function DashboardReview({ onOpen }: { onOpen: (point: KnowledgePoint) => void }) {
   const { points, overview, loading, error, reload } = useReviewData()
   const [showAdd, setShowAdd] = useState(false)
-  return <section aria-label="答辩雷达图与风险复习看板" className="stage7c-dark my-6 space-y-4 rounded-2xl border border-slate-700 bg-slate-950/40 p-4 text-slate-100 sm:p-6">
+  return <section aria-label="答辩雷达图与风险复习看板" className="review-workspace-dark my-6 space-y-4 rounded-2xl border border-slate-700 bg-slate-950/40 p-4 text-slate-100 sm:p-6">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><p className="text-xs font-semibold tracking-widest text-cyan-300">知识重点与复习</p><h2 className="mt-1 text-xl font-bold">答辩能力与风险看板</h2><p className="mt-1 text-sm text-slate-400">一屏掌握重点知识、薄弱点与复习进展</p></div>
       <div className="flex gap-2"><button className={secondary} onClick={() => void reload()}><RefreshCw size={14} className="mr-1 inline" />刷新</button><button className={primary} onClick={() => setShowAdd(v => !v)}><BookOpen size={15} className="mr-1 inline" />{showAdd ? '收起录入' : '添加复习知识'}</button></div>
@@ -315,7 +315,7 @@ function SessionNotes({ sessionId, onOpen, onClose }: { sessionId: string; onOpe
   const { points, loading, error, reload } = useReviewData(sessionId)
   const [tab, setTab] = useState<'search' | 'saved'>('search')
   return <div className="fixed inset-0 z-[150] flex items-center justify-end bg-slate-900/45 p-0 sm:p-4" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
-    <section role="dialog" aria-modal="true" aria-label="答辩知识点标记" className="stage7c-dark h-full w-full max-w-xl overflow-y-auto bg-slate-900 p-5 shadow-2xl sm:h-[min(92vh,900px)] sm:rounded-2xl sm:p-6">
+    <section role="dialog" aria-modal="true" aria-label="答辩知识点标记" className="review-workspace-dark h-full w-full max-w-xl overflow-y-auto bg-slate-900 p-5 shadow-2xl sm:h-[min(92vh,900px)] sm:rounded-2xl sm:p-6">
       <div className="flex items-center justify-between gap-2"><div><h2 className="text-lg font-bold text-slate-50">答辩知识重点</h2><p className="text-xs text-slate-400">本次会话的知识点保存至本地，之后仍可复习</p></div><button className={secondary} aria-label="关闭知识标记" onClick={onClose}><X size={17}/></button></div>
       <div className="mt-5 flex gap-2 border-b border-slate-700 pb-3"><button className={tab === 'search' ? primary : secondary} onClick={() => setTab('search')}>检索 / 标记</button><button className={tab === 'saved' ? primary : secondary} onClick={() => setTab('saved')}>本场已保存 ({points.length})</button></div>
       {error && <p className="mt-3 text-sm text-rose-300">{error}</p>}

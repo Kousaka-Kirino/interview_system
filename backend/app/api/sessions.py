@@ -17,7 +17,7 @@ from app.services.resume_parser import resume_context
 from app.services.practice_mode import INTERNAL_FLAG, is_internal_resume, practice_mode, project_context
 from app.services.focus_practice import resolve_focus, focus_of
 from app.services.review_lock import review_lock
-from app.stage8b_auth import require_owner_id
+from app.account_auth import require_owner_id
 from app.models.session import (
     InterviewSession,
     InterviewTurn,
@@ -453,7 +453,7 @@ def submit_answer(
             "答辩已经结束",
         )
 
-    # A client cannot bypass the defense opening stage with a direct API call.
+    # A client cannot bypass the defense opening requirement through a direct API call.
     if session.config_data.get('opening_required') and not session.config_data.get('opening_analysis'):
         raise HTTPException(409, '请先结束自我陈述，让 AI 结合 PPT 生成第一题')
     if not session.turns:

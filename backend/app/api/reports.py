@@ -36,7 +36,7 @@ from app.services.deepseek_interview import (
 from app.services.report_ai import create_ai_analysis
 from app.services.ai_study_points import save_weak_points
 from app.services.review_lock import review_lock
-from app.stage8b_auth import require_owner_id
+from app.account_auth import require_owner_id
 
 from app.services.report_service import (
     build_report,

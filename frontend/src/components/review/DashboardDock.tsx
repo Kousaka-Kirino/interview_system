@@ -17,7 +17,7 @@ type Placement = {
   scoreClass: string
 }
 
-const isOwned = (element: Element) => Boolean(element.closest('[data-stage7b-owned]'))
+const isOwned = (element: Element) => Boolean(element.closest('[data-review-dock-owned]'))
 
 function findScoreGrid(root: HTMLElement): { grid: HTMLElement; scoreCard: HTMLElement } | null {
   const elements = Array.from(root.querySelectorAll('div, span, p, h2, h3, h4, strong, button'))
@@ -33,7 +33,7 @@ function findScoreGrid(root: HTMLElement): { grid: HTMLElement; scoreCard: HTMLE
       const className = typeof grid.className === 'string' ? grid.className : ''
       const display = window.getComputedStyle(grid).display
       if (display !== 'grid' && display !== 'flex' && !/grid|flex/.test(className)) continue
-      if (grid.children.length === 5 && !grid.querySelector('[data-stage7b-owned]')) continue
+      if (grid.children.length === 5 && !grid.querySelector('[data-review-dock-owned]')) continue
       return { grid, scoreCard: descendant }
     }
   }
@@ -73,17 +73,17 @@ function tryPlacement(root: HTMLElement): Placement | null {
   if (!history?.parentElement || history.contains(score.grid)) return null
 
   const contentHost = document.createElement('div')
-  contentHost.dataset.stage7bOwned = 'review'
-  contentHost.id = 'stage7b-risk-at-history'
+  contentHost.dataset.reviewDockOwned = 'review'
+  contentHost.id = 'review-dock-risk-at-history'
   contentHost.className = 'w-full'
   history.parentElement.insertBefore(contentHost, history)
 
   const tileHost = document.createElement('div')
-  tileHost.dataset.stage7bOwned = 'tile'
-  tileHost.id = 'stage7b-history-card-slot'
-  tileHost.className = 'stage7b-tile-slot'
+  tileHost.dataset.reviewDockOwned = 'tile'
+  tileHost.id = 'review-dock-history-card-slot'
+  tileHost.className = 'review-dock-tile-slot'
   score.grid.insertBefore(tileHost, score.scoreCard.nextSibling)
-  score.grid.classList.add('stage7b-five-tile-grid')
+  score.grid.classList.add('review-dock-five-tile-grid')
   const previousDisplay = history.style.display
   history.style.display = 'none'
   return {
@@ -94,7 +94,7 @@ function tryPlacement(root: HTMLElement): Placement | null {
 
 function removePlacement(p: Placement) {
   p.history.style.display = p.previousDisplay
-  p.stats.classList.remove('stage7b-five-tile-grid')
+  p.stats.classList.remove('review-dock-five-tile-grid')
   p.contentHost.remove()
   p.tileHost.remove()
 }
@@ -147,17 +147,17 @@ export default function DashboardDock({ children }: { children: ReactNode }) {
   return <>
     {placement && createPortal(
       <button type="button" aria-label={view === 'history' ? '返回雷达图与薄弱点' : '查看历史答辩记录'} aria-pressed={view === 'history'} onClick={openHistory}
-        className={`${placement.scoreClass} stage7b-history-button ${view === 'history' ? 'stage7b-history-button-active' : ''}`}>
-        <span className="stage7b-card-top"><span>历史答辩</span><History size={19} aria-hidden="true" /></span>
-        <span className="stage7b-card-number">{view === 'history' ? '返回看板' : '查看记录'}</span>
-        <span className="stage7b-card-hint">{view === 'history' ? '再次点击显示风险复习' : '点击显示原历史答辩列表'}</span>
+        className={`${placement.scoreClass} review-dock-history-button ${view === 'history' ? 'review-dock-history-button-active' : ''}`}>
+        <span className="review-dock-card-top"><span>历史答辩</span><History size={19} aria-hidden="true" /></span>
+        <span className="review-dock-card-number">{view === 'history' ? '返回看板' : '查看记录'}</span>
+        <span className="review-dock-card-hint">{view === 'history' ? '再次点击显示风险复习' : '点击显示原历史答辩列表'}</span>
       </button>, placement.tileHost,
     )}
     {placement && createPortal(
       view === 'history' ? null : children,
       placement.contentHost,
     )}
-    {waiting && !placement && <p role="status" className="stage7b-placement-warning" data-stage7b-owned="warning">
+    {waiting && !placement && <p role="status" className="review-dock-placement-warning" data-review-dock-owned="warning">
       雷达图正在定位原“历史答辩”区域。如果此提示持续显示，说明现有仪表盘结构与布局适配规则不同，请提供 frontend/src/pages/DashboardPage.tsx 以便精确接入；原有历史列表不会被删除。
     </p>}
   </>

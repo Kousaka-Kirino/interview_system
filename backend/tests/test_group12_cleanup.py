@@ -17,13 +17,13 @@ class CurrentReleaseContracts(unittest.TestCase):
         self.assertNotIn('自我陈述环节将在下一组开发', page)
 
     def test_account_errors_give_current_guidance(self):
-        code = source('backend/app/stage8b_auth.py')
+        code = source('backend/app/account_auth.py')
         self.assertIn('请检查后端启动日志和本地账号数据库', code)
         self.assertNotIn('请重新安装 Stage 8C', code)
         self.assertNotIn('请确认 Stage 8A / 8B 已完成', code)
 
     def test_speech_message_names_dependency(self):
-        self.assertIn('请在项目虚拟环境安装 faster-whisper', source('backend/app/stage9_speech.py'))
+        self.assertIn('请在项目虚拟环境安装 faster-whisper', source('backend/app/speech_transcription.py'))
 
     def test_ppt_pagination_hotfix_preserved(self):
         code = source('frontend/src/components/presentation/SlideDeck.tsx')
@@ -35,7 +35,7 @@ class CurrentReleaseContracts(unittest.TestCase):
     def test_core_routers_and_account_boundary_preserved(self):
         main = source('backend/app/main.py')
         for token in ('initialize_account_database()', 'init_db()',
-                      'stage8b_install_auth(app)', 'stage8c2_install_owner_scope(app)',
+                      'install_account_auth(app)', 'install_account_owner_scope(app)',
                       'app.include_router(sessions_router)'):
             self.assertIn(token, main)
 

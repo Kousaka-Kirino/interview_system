@@ -22,7 +22,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
-from app.stage11_local import get_user_settings
+from app.account_storage import get_user_settings
 from app.core.database import get_db
 
 from app.models.material import Material
@@ -40,7 +40,7 @@ from app.services.presentation_local import (
 )
 from app.services.deepseek_interview import InterviewLLM, InterviewLLMError, get_interview_llm
 from app.services.review_lock import review_lock
-from app.stage8b_auth import require_owner_id
+from app.account_auth import require_owner_id
 from pydantic import BaseModel, Field
 from uuid import UUID
 import json

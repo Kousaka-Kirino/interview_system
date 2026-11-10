@@ -52,7 +52,7 @@ test('11 · 语音 Portal 指向原答题框而非自我陈述框', () => {
   assert.doesNotMatch(voice,/main textarea:not\(\.stage9-textarea\)/)
 })
 test('11 · 后端原始 PPTX 和 DOCX 并存且无数据库迁移', () => {
-  const importPpt=read('../backend/app/stage10_pptx.py')
+  const importPpt=read('../backend/app/pptx_import.py')
   const local=read('../backend/app/services/presentation_local.py')
   assert.match(importPpt,/original_path\(account_settings\(require_owner_id\(request\)\)/)
   assert.match(importPpt,/converted_name/)

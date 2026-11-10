@@ -97,8 +97,8 @@ export default function AuthGate() {
       return
     }
     const slot = document.createElement('span')
-    slot.className = 'stage8d-nav-account-slot'
-    slot.setAttribute('data-stage8d-nav-slot', 'true')
+    slot.className = 'account-nav-nav-account-slot'
+    slot.setAttribute('data-account-nav-nav-slot', 'true')
     let queued = false
     let active = true
     let pendingFrame: number | null = null
@@ -226,86 +226,86 @@ export default function AuthGate() {
 
   if (mode === 'ready') return <>
     {navSlot && createPortal(
-      <div className="stage8b-account-control" role="group" aria-label="当前账户">
+      <div className="account-auth-account-control" role="group" aria-label="当前账户">
         <span>账号：{username}</span>
         <button type="button" onClick={() => void openProfile()} disabled={busy}>个人资料</button>
         <button type="button" onClick={() => void logout()} disabled={busy}>{busy ? '请稍候…' : '退出登录'}</button>
-        {error && <span className="stage8b-account-error" role="alert">{error}</span>}
+        {error && <span className="account-auth-account-error" role="alert">{error}</span>}
       </div>,
       navSlot,
     )}
-    {profileOpen && <div className="stage8c-profile-overlay" role="dialog" aria-modal="true" aria-label="个人信息设置">
-      <div className="stage8c-profile-card">
-        <div className="stage8c-profile-head">
-          <div><p className="stage8b-eyebrow">ACCOUNT SETTINGS</p><h2>个人信息</h2><p>当前账号：{username} · 资料仅保存在本机</p></div>
-          <button type="button" className="stage8c-profile-close" onClick={() => setProfileOpen(false)} aria-label="关闭设置">×</button>
+    {profileOpen && <div className="account-profile-profile-overlay" role="dialog" aria-modal="true" aria-label="个人信息设置">
+      <div className="account-profile-profile-card">
+        <div className="account-profile-profile-head">
+          <div><p className="account-auth-eyebrow">ACCOUNT SETTINGS</p><h2>个人信息</h2><p>当前账号：{username} · 资料仅保存在本机</p></div>
+          <button type="button" className="account-profile-profile-close" onClick={() => setProfileOpen(false)} aria-label="关闭设置">×</button>
         </div>
-        {profileError && <p className="stage8b-message stage8b-error" role="alert">{profileError}</p>}
-        {profileMessage && <p className="stage8c-profile-success" role="status">{profileMessage}</p>}
-        {profile && <form className="stage8b-fields" onSubmit={(event) => void saveProfile(event)}>
-          <label htmlFor="stage8c-nickname">昵称</label>
-          <input id="stage8c-nickname" value={nickname} maxLength={80} required onChange={(e) => setNickname(e.target.value)} />
-          <label htmlFor="stage8c-email">联系邮箱（不验证，仅作为备注）</label>
-          <input id="stage8c-email" value={contactEmail} maxLength={254} onChange={(e) => setContactEmail(e.target.value)} placeholder="选填" />
-          <button type="submit" className="stage8b-primary" disabled={busy}>保存个人信息</button>
+        {profileError && <p className="account-auth-message account-auth-error" role="alert">{profileError}</p>}
+        {profileMessage && <p className="account-profile-profile-success" role="status">{profileMessage}</p>}
+        {profile && <form className="account-auth-fields" onSubmit={(event) => void saveProfile(event)}>
+          <label htmlFor="account-profile-nickname">昵称</label>
+          <input id="account-profile-nickname" value={nickname} maxLength={80} required onChange={(e) => setNickname(e.target.value)} />
+          <label htmlFor="account-profile-email">联系邮箱（不验证，仅作为备注）</label>
+          <input id="account-profile-email" value={contactEmail} maxLength={254} onChange={(e) => setContactEmail(e.target.value)} placeholder="选填" />
+          <button type="submit" className="account-auth-primary" disabled={busy}>保存个人信息</button>
         </form>}
-        <div className="stage8c-profile-divider" />
-        <form className="stage8b-fields" onSubmit={(event) => void saveProfilePassword(event)}>
+        <div className="account-profile-profile-divider" />
+        <form className="account-auth-fields" onSubmit={(event) => void saveProfilePassword(event)}>
           <h3>修改登录密码</h3>
-          <p className="stage8c-profile-note">修改密码后请妥善保存；当前不提供邮箱找回密码服务。</p>
-          <label htmlFor="stage8c-new-password">新密码</label>
-          <input id="stage8c-new-password" type="password" autoComplete="new-password" value={profilePassword} onChange={(e) => setProfilePassword(e.target.value)} required />
-          <button type="submit" className="stage8b-primary" disabled={busy}>更新密码</button>
+          <p className="account-profile-profile-note">修改密码后请妥善保存；当前不提供邮箱找回密码服务。</p>
+          <label htmlFor="account-profile-new-password">新密码</label>
+          <input id="account-profile-new-password" type="password" autoComplete="new-password" value={profilePassword} onChange={(e) => setProfilePassword(e.target.value)} required />
+          <button type="submit" className="account-auth-primary" disabled={busy}>更新密码</button>
         </form>
       </div>
     </div>}
   </>
 
-  return <div className="stage8b-overlay" role="dialog" aria-modal="true" aria-label="答辩训练账户认证">
-    <div className="stage8b-auth-card">
-      <div className="stage8b-brand-mark">D2</div>
-      <p className="stage8b-eyebrow">DEFENSE TRAINING</p>
+  return <div className="account-auth-overlay" role="dialog" aria-modal="true" aria-label="答辩训练账户认证">
+    <div className="account-auth-auth-card">
+      <div className="account-auth-brand-mark">D2</div>
+      <p className="account-auth-eyebrow">DEFENSE TRAINING</p>
       <h1>AI 答辩训练系统</h1>
-      <p className="stage8b-intro">登录或注册本机账号，管理自己的简历、答辩记录与复习资料。不同用户的数据分开保存。</p>
-      {mode === 'checking' && <div className="stage8b-status" role="status">正在验证登录状态…</div>}
-      {mode === 'offline' && <div className="stage8b-fields">
-        <p className="stage8b-message stage8b-error" role="alert">{error || '无法连接账号服务。'}</p>
-        <button className="stage8b-primary" type="button" onClick={() => void check()}>重新连接</button>
+      <p className="account-auth-intro">登录或注册本机账号，管理自己的简历、答辩记录与复习资料。不同用户的数据分开保存。</p>
+      {mode === 'checking' && <div className="account-auth-status" role="status">正在验证登录状态…</div>}
+      {mode === 'offline' && <div className="account-auth-fields">
+        <p className="account-auth-message account-auth-error" role="alert">{error || '无法连接账号服务。'}</p>
+        <button className="account-auth-primary" type="button" onClick={() => void check()}>重新连接</button>
       </div>}
-      {mode === 'login' && <form className="stage8b-fields" onSubmit={(event) => void signIn(event)}>
-        <label htmlFor="stage8b-name">用户名</label>
-        <input id="stage8b-name" autoComplete="username" value={username} onChange={event => setUsername(event.target.value)} maxLength={80} required />
-        <label htmlFor="stage8b-password">密码</label>
-        <input id="stage8b-password" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required />
-        {error && <p className="stage8b-message stage8b-error" role="alert">{error}</p>}
-        <button className="stage8b-primary" type="submit" disabled={busy}>{busy ? '验证中…' : '登录'}</button>
-        <button className="stage11-mode-switch" type="button" disabled={busy} onClick={() => { setMode('register'); setUsername(''); setPassword(''); setError('') }}>没有账号？在本机注册</button>
-        <p className="stage8b-hint">账号仅创建在本机，其他电脑无法直接登录本机账号。</p>
+      {mode === 'login' && <form className="account-auth-fields" onSubmit={(event) => void signIn(event)}>
+        <label htmlFor="account-auth-name">用户名</label>
+        <input id="account-auth-name" autoComplete="username" value={username} onChange={event => setUsername(event.target.value)} maxLength={80} required />
+        <label htmlFor="account-auth-password">密码</label>
+        <input id="account-auth-password" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required />
+        {error && <p className="account-auth-message account-auth-error" role="alert">{error}</p>}
+        <button className="account-auth-primary" type="submit" disabled={busy}>{busy ? '验证中…' : '登录'}</button>
+        <button className="account-register-mode-switch" type="button" disabled={busy} onClick={() => { setMode('register'); setUsername(''); setPassword(''); setError('') }}>没有账号？在本机注册</button>
+        <p className="account-auth-hint">账号仅创建在本机，其他电脑无法直接登录本机账号。</p>
       </form>}
-      {mode === 'register' && <form className="stage8b-fields" onSubmit={(event) => void registerLocal(event)}>
-        <label htmlFor="stage11-username">新用户名（3～32 位英文字母、数字或下划线）</label>
-        <input id="stage11-username" autoComplete="username" value={username} onChange={event => setUsername(event.target.value)} minLength={3} maxLength={32} required />
-        <label htmlFor="stage11-password">设置密码（至少 12 位）</label>
-        <input id="stage11-password" type="password" autoComplete="new-password" value={registerPassword} onChange={event => setRegisterPassword(event.target.value)} minLength={12} required />
-        <label htmlFor="stage11-confirm">确认密码</label>
-        <input id="stage11-confirm" type="password" autoComplete="new-password" value={registerConfirm} onChange={event => setRegisterConfirm(event.target.value)} minLength={12} required />
-        {error && <p className="stage8b-message stage8b-error" role="alert">{error}</p>}
-        <button className="stage8b-primary" type="submit" disabled={busy}>{busy ? '创建账号中…' : '创建本地账号'}</button>
-        <button className="stage11-mode-switch" type="button" disabled={busy} onClick={() => { setMode('login'); setUsername(''); setRegisterPassword(''); setRegisterConfirm(''); setError('') }}>已有账号？返回登录</button>
-        <p className="stage8b-hint">新账号的简历、PPT、答辩记录与向量索引单独存放在本地；请妥善保管密码，当前没有邮箱找回功能。</p>
+      {mode === 'register' && <form className="account-auth-fields" onSubmit={(event) => void registerLocal(event)}>
+        <label htmlFor="account-register-username">新用户名（3～32 位英文字母、数字或下划线）</label>
+        <input id="account-register-username" autoComplete="username" value={username} onChange={event => setUsername(event.target.value)} minLength={3} maxLength={32} required />
+        <label htmlFor="account-register-password">设置密码（至少 12 位）</label>
+        <input id="account-register-password" type="password" autoComplete="new-password" value={registerPassword} onChange={event => setRegisterPassword(event.target.value)} minLength={12} required />
+        <label htmlFor="account-register-confirm">确认密码</label>
+        <input id="account-register-confirm" type="password" autoComplete="new-password" value={registerConfirm} onChange={event => setRegisterConfirm(event.target.value)} minLength={12} required />
+        {error && <p className="account-auth-message account-auth-error" role="alert">{error}</p>}
+        <button className="account-auth-primary" type="submit" disabled={busy}>{busy ? '创建账号中…' : '创建本地账号'}</button>
+        <button className="account-register-mode-switch" type="button" disabled={busy} onClick={() => { setMode('login'); setUsername(''); setRegisterPassword(''); setRegisterConfirm(''); setError('') }}>已有账号？返回登录</button>
+        <p className="account-auth-hint">新账号的简历、PPT、答辩记录与向量索引单独存放在本地；请妥善保管密码，当前没有邮箱找回功能。</p>
       </form>}
-      {mode === 'change' && <form className="stage8b-fields" onSubmit={(event) => void changePassword(event)}>
-        <p className="stage8b-message stage8b-warning">首次登录必须更换初始密码。新密码至少 12 位。</p>
-        <label htmlFor="stage8b-old">当前密码</label>
-        <input id="stage8b-old" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required />
-        <label htmlFor="stage8b-new">新密码（至少 12 位）</label>
-        <input id="stage8b-new" type="password" autoComplete="new-password" value={nextPassword} onChange={event => setNextPassword(event.target.value)} minLength={12} required />
-        <label htmlFor="stage8b-confirm">确认新密码</label>
-        <input id="stage8b-confirm" type="password" autoComplete="new-password" value={confirmation} onChange={event => setConfirmation(event.target.value)} minLength={12} required />
-        {error && <p className="stage8b-message stage8b-error" role="alert">{error}</p>}
-        <button className="stage8b-primary" type="submit" disabled={busy}>{busy ? '保存中…' : '设置新密码并进入工作台'}</button>
+      {mode === 'change' && <form className="account-auth-fields" onSubmit={(event) => void changePassword(event)}>
+        <p className="account-auth-message account-auth-warning">首次登录必须更换初始密码。新密码至少 12 位。</p>
+        <label htmlFor="account-auth-old">当前密码</label>
+        <input id="account-auth-old" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required />
+        <label htmlFor="account-auth-new">新密码（至少 12 位）</label>
+        <input id="account-auth-new" type="password" autoComplete="new-password" value={nextPassword} onChange={event => setNextPassword(event.target.value)} minLength={12} required />
+        <label htmlFor="account-auth-confirm">确认新密码</label>
+        <input id="account-auth-confirm" type="password" autoComplete="new-password" value={confirmation} onChange={event => setConfirmation(event.target.value)} minLength={12} required />
+        {error && <p className="account-auth-message account-auth-error" role="alert">{error}</p>}
+        <button className="account-auth-primary" type="submit" disabled={busy}>{busy ? '保存中…' : '设置新密码并进入工作台'}</button>
       </form>}
-      <p className="stage8b-footer">本机模式 · SQLite 账号 · 新用户独立资料空间</p>
+      <p className="account-auth-footer">本机模式 · SQLite 账号 · 新用户独立资料空间</p>
     </div>
   </div>
 }

@@ -79,7 +79,7 @@ export default function DefenseVoiceTimer() {
     : undefined
   const turnKey = sessionId && pendingTurn ? `stage9:deadline:${sessionId}:${pendingTurn.id}` : null
   turnRef.current = turnKey
-  // Stage 9C: per-session setting, bound when leaving #configure for a newly created session.
+  // Per-session time settings apply when the user creates a new session.
   let answerMinutes = DEFAULT_MINUTES
   try { answerMinutes = durationForSession(sessionId, window.localStorage) }
   catch { /* storage may be restricted in private mode */ }
@@ -123,11 +123,11 @@ export default function DefenseVoiceTimer() {
   useEffect(() => {
     if (!turnKey) { setSlot(null); return }
     const element = document.createElement('div')
-    element.className = 'stage9-portal-slot'
+    element.className = 'speech-portal-slot'
     let active = true
     const place = () => {
       if (!active) return
-      // Stage 9B: keep the countdown and microphone with the ORIGINAL answer field.
+      // Keep the countdown and microphone with the single answer field.
       // Never prepend the add-on to <main> (that puts it above the question).
       const answerField = document.querySelector<HTMLTextAreaElement>('#current-answer')
       const holder = answerField?.parentElement
@@ -376,60 +376,60 @@ export default function DefenseVoiceTimer() {
   const late = !unlimited && remaining <= 0
   const totalLate = totalActive && totalRemaining <= 0
   return createPortal(<>
-    <section className="stage9-panel" aria-label="语音答辩与每题倒计时">
-      <div className="stage9-title">
+    <section className="speech-panel" aria-label="语音答辩与每题倒计时">
+      <div className="speech-title">
         <h3>语音回答 · 第 {pendingTurn.question_number ?? '—'} 题</h3>
-        <div className="stage9d-timer-pair">
-          <div className="stage9d-timer-block">
-            <span className="stage9d-timer-label">本题剩余</span>
-            <div className={`stage9-timer${late ? ' expired' : !unlimited && remaining <= 30 ? ' warning' : ''}`} role="timer" aria-label="本题剩余时间">
+        <div className="speech-duration-timer-pair">
+          <div className="speech-duration-timer-block">
+            <span className="speech-duration-timer-label">本题剩余</span>
+            <div className={`speech-timer${late ? ' expired' : !unlimited && remaining <= 30 ? ' warning' : ''}`} role="timer" aria-label="本题剩余时间">
               {unlimited ? '不限时' : late ? `超时 +${formatTimer(remaining)}` : formatTimer(remaining)}
             </div>
           </div>
-          <div className="stage9d-timer-block">
-            <span className="stage9d-timer-label">本场剩余</span>
-            <div className={`stage9-timer${totalLate ? ' expired' : totalActive && totalRemaining <= 60 ? ' warning' : ''}`} role="timer" aria-label="本场剩余时间">
+          <div className="speech-duration-timer-block">
+            <span className="speech-duration-timer-label">本场剩余</span>
+            <div className={`speech-timer${totalLate ? ' expired' : totalActive && totalRemaining <= 60 ? ' warning' : ''}`} role="timer" aria-label="本场剩余时间">
               {!totalActive ? '不限时' : totalLate ? `超时 +${formatTimer(totalRemaining)}` : formatTimer(totalRemaining)}
             </div>
           </div>
         </div>
       </div>
-      {!unlimited && <div className="stage9-progress"><span style={{ width: `${Math.max(0, Math.min(100, remaining / (answerMinutes * 60) * 100))}%` }} /></div>}
-      <p className="stage9-help">本题：{unlimited ? '不限时' : `${answerMinutes} 分钟`}；本场：{totalMinutes === 0 ? '不限时' : `${totalMinutes} 分钟`}。
+      {!unlimited && <div className="speech-progress"><span style={{ width: `${Math.max(0, Math.min(100, remaining / (answerMinutes * 60) * 100))}%` }} /></div>}
+      <p className="speech-help">本题：{unlimited ? '不限时' : `${answerMinutes} 分钟`}；本场：{totalMinutes === 0 ? '不限时' : `${totalMinutes} 分钟`}。
         两个倒计时同时运行，录音、转写、修改文字均计时。刷新及换题不会重置本场时间；单段录音最长约 2 分钟。</p>
-      <div className="stage9-row">
+      <div className="speech-row">
         {recording
-          ? <button type="button" className="stage9-button stop" onClick={stopRecording}>■ 停止录音并识别</button>
-          : <button type="button" className="stage9-button record" disabled={skipping || transcribing} onClick={() => void startRecording()}>🎙 开始语音回答</button>}
-        {transcribing && <span className="stage9-status" role="status">正在本地转文字…</span>}
+          ? <button type="button" className="speech-button stop" onClick={stopRecording}>■ 停止录音并识别</button>
+          : <button type="button" className="speech-button record" disabled={skipping || transcribing} onClick={() => void startRecording()}>🎙 开始语音回答</button>}
+        {transcribing && <span className="speech-status" role="status">正在本地转文字…</span>}
       </div>
-      <p className="stage9-help">语音识别结果会自动追加到下方唯一的回答框，检查并编辑后点击“提交回答”。无需单独提交语音草稿。</p>
-      {!!notice && <p role="status" className="stage9-status">{notice}</p>}
-      {!!error && <p role="alert" className="stage9-error">{error}</p>}
+      <p className="speech-help">语音识别结果会自动追加到下方唯一的回答框，检查并编辑后点击“提交回答”。无需单独提交语音草稿。</p>
+      {!!notice && <p role="status" className="speech-status">{notice}</p>}
+      {!!error && <p role="alert" className="speech-error">{error}</p>}
     </section>
-    {totalTimeoutPrompt && <div className="stage9-modal-bg" role="dialog" aria-modal="true" aria-label="本次答辩总时间已到">
-      <div className="stage9-modal">
+    {totalTimeoutPrompt && <div className="speech-modal-bg" role="dialog" aria-modal="true" aria-label="本次答辩总时间已到">
+      <div className="speech-modal">
         <h3>本次答辩的 {totalMinutes} 分钟已结束</h3>
         <p>总时长已到。你可以继续本次答辩（显示超出时间），也可以结束本场并查看报告。</p>
         <p>结束本场会调用原有完成接口；尚未提交的文字不会自动保存。请先保存有需要的回答。</p>
-        {!!error && <p role="alert" className="stage9-error">{error}</p>}
-        <div className="stage9-row">
-          <button type="button" className="stage9-button primary" disabled={finishing} onClick={continueSession}>继续本次答辩</button>
-          <button type="button" className="stage9-button stop" disabled={finishing} onClick={() => void finishSession()}>
+        {!!error && <p role="alert" className="speech-error">{error}</p>}
+        <div className="speech-row">
+          <button type="button" className="speech-button primary" disabled={finishing} onClick={continueSession}>继续本次答辩</button>
+          <button type="button" className="speech-button stop" disabled={finishing} onClick={() => void finishSession()}>
             {finishing ? '结束中…' : '结束本场答辩'}
           </button>
         </div>
       </div>
     </div>}
-    {timeoutPrompt && <div className="stage9-modal-bg" role="dialog" aria-modal="true" aria-label="本题已超时">
-      <div className="stage9-modal">
+    {timeoutPrompt && <div className="speech-modal-bg" role="dialog" aria-modal="true" aria-label="本题已超时">
+      <div className="speech-modal">
         <h3>本题 {answerMinutes} 分钟已结束</h3>
         <p>你还没有完成本题。可以继续回答（显示超时用时），或者跳过本题、进入下一题。</p>
         <p>跳过会把“本题超时跳过”作为文字记录交给原有答辩后端；原有评分逻辑可能仍会评价这条记录。</p>
-        {!!error && <p role="alert" className="stage9-error">{error}</p>}
-        <div className="stage9-row">
-          <button type="button" className="stage9-button primary" onClick={continueAnswer}>继续完成本题</button>
-          <button type="button" className="stage9-button stop" onClick={() => void submitAnswer(true)}>跳过并进入下一题</button>
+        {!!error && <p role="alert" className="speech-error">{error}</p>}
+        <div className="speech-row">
+          <button type="button" className="speech-button primary" onClick={continueAnswer}>继续完成本题</button>
+          <button type="button" className="speech-button stop" onClick={() => void submitAnswer(true)}>跳过并进入下一题</button>
         </div>
       </div>
     </div>}

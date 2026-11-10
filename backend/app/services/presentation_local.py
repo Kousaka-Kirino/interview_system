@@ -37,7 +37,7 @@ def slide_texts(upload_dir: Path, material) -> tuple[list[dict], bool]:
     if original.is_file():
         if original.stat().st_size > MAX_FILE_BYTES:
             raise PresentationError('PPTX 文件超过上传大小限制')
-        from app.stage10_pptx import extract_pptx_pages
+        from app.pptx_import import extract_pptx_pages
         pages = extract_pptx_pages(original.read_bytes())
         return ([{'index': i, 'text': '\n'.join(paragraphs)[:16000]}
                  for i, paragraphs in pages], True)

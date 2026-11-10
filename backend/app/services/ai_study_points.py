@@ -3,7 +3,7 @@
 import uuid
 
 from app.schemas.report import AIAnalysis, InterviewReportView
-from app.stage7_review import _database, _now
+from app.knowledge_review import _database, _now
 
 
 def save_weak_points(user_id: str, report: InterviewReportView, analysis: AIAnalysis) -> int:

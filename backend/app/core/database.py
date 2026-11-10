@@ -14,8 +14,8 @@ from sqlalchemy.orm import (
 )
 
 from app.core.config import get_settings
-from app.stage11_local import is_legacy_owner, user_root
-from app.stage8b_auth import require_owner_id
+from app.account_storage import is_legacy_owner, user_root
+from app.account_auth import require_owner_id
 
 settings = get_settings()
 

@@ -1,0 +1,16 @@
+/* Review workspace dark surface, scoped to this component. */
+.review-workspace-dark { color-scheme: dark; color: #e8eefc; background-color: #0d172b; }
+.review-workspace-dark input:not([type="checkbox"]),
+.review-workspace-dark textarea,
+.review-workspace-dark select { color-scheme: dark; }
+.review-workspace-dark input::placeholder,
+.review-workspace-dark textarea::placeholder { color: #8899b8; opacity: 1; }
+.review-workspace-dark button:focus-visible,
+.review-workspace-dark input:focus-visible,
+.review-workspace-dark select:focus-visible,
+.review-workspace-dark textarea:focus-visible { outline: 2px solid #22d3ee; outline-offset: 2px; }
+.review-workspace-dark button:not(:disabled) { cursor: pointer; }
+.review-workspace-dark button:disabled { cursor: not-allowed; }
+.review-workspace-dark ::selection { background-color: #155e75; color: #fff; }
+/* Both the dashboard and dialogs inherit the same deep navy palette. */
+.review-workspace-dark [role="status"] { overflow-wrap: anywhere; }

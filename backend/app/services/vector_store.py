@@ -7,7 +7,7 @@ ChromaDB 持久化 + 本地 BGE Embedding。
 
 from functools import lru_cache
 from fastapi import Request
-from app.stage11_local import get_user_settings
+from app.account_storage import get_user_settings
 
 from app.core.config import Settings, get_settings
 from app.schemas.material import MaterialHit
